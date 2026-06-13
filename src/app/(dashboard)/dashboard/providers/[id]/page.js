@@ -5,14 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Card, Button, Badge, Input, Modal, CardSkeleton, OAuthModal, KiroOAuthWrapper, CursorAuthModal, IFlowCookieModal, GitLabAuthModal, Toggle, Select, EditConnectionModal, NoAuthProxyCard, ConfirmModal } from "@/shared/components";
+import GlassAlert from "@/shared/components/GlassAlert";
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, WEB_COOKIE_PROVIDERS, getProviderAlias, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, AI_PROVIDERS, THINKING_CONFIG } from "@/shared/constants/providers";
 import { getModelsByProviderId } from "@/shared/constants/models";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { translate } from "@/i18n/runtime";
 import { fetchSuggestedModels } from "@/shared/utils/providerModelsFetcher";
-import ModelRow from "./ModelRow";
 import PassthroughModelsSection from "./PassthroughModelsSection";
-import CompatibleModelsSection from "./CompatibleModelsSection";
+import ModelsManagerPanel from "../components/ModelsManagerPanel";
+import { useNotificationStore } from "@/store/notificationStore";
 import ConnectionRow from "./ConnectionRow";
 import AddApiKeyModal from "./AddApiKeyModal";
 import EditCompatibleNodeModal from "./EditCompatibleNodeModal";
@@ -67,6 +68,7 @@ export default function ProviderDetailPage() {
   const stopOneByOneRef = useRef(false);
   const [importingQoderModels, setImportingQoderModels] = useState(false);
   const { copied, copy } = useCopyToClipboard();
+  const notify = useNotificationStore();
 
   const AG_RISK_STORAGE_KEY = "ag_risk_confirmed";
 
@@ -418,7 +420,7 @@ export default function ProviderDetailPage() {
     if (importingQoderModels) return;
     const activeConnection = connections.find((conn) => conn.isActive !== false);
     if (!activeConnection) {
-      alert(translate("Please add an active Qoder connection first"));
+      notify.warning(translate("Please add an active Qoder connection first"), "Qoder import");
       return;
     }
 
@@ -427,12 +429,12 @@ export default function ProviderDetailPage() {
       const res = await fetch(`/api/providers/${activeConnection.id}/models`);
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || translate("Failed to fetch models"));
+        notify.error(data.error || translate("Failed to fetch models"), "Qoder import");
         return;
       }
       const models = data.models || [];
       if (models.length === 0) {
-        alert(translate("No models returned"));
+        notify.info(translate("No models returned"), "Qoder import");
         return;
       }
 
@@ -440,34 +442,34 @@ export default function ProviderDetailPage() {
       for (const model of models) {
         const modelId = model.id || model.name;
         if (!modelId) continue;
-        
-        // Qoder model ID format may be "qoder/auto" or "auto", need to remove prefix
+
         const cleanModelId = modelId.replace(/^qoder\//, "");
         const fullModel = `${providerStorageAlias}/${cleanModelId}`;
-        
-        // Check if already exists
+
         if (Object.values(modelAliases).includes(fullModel)) {
           continue;
         }
-        
-        // Use model ID as alias
+
         const alias = cleanModelId;
         if (modelAliases[alias]) {
           continue;
         }
-        
+
         await handleSetAlias(cleanModelId, alias, providerStorageAlias);
         importedCount += 1;
       }
-      
+
       if (importedCount === 0) {
-        alert(translate("All models already exist, no new models added"));
+        notify.info(translate("All models already exist, no new models added"), "Qoder import");
       } else {
-        alert(translate("Successfully added") + ` ${importedCount} ` + translate("models"));
+        notify.success(
+          `${translate("Successfully added")} ${importedCount} ${translate("models")}`,
+          "Qoder import"
+        );
       }
     } catch (error) {
       console.log("Error importing Qoder models:", error);
-      alert(translate("Error fetching models") + ": " + error.message);
+      notify.error(`${translate("Error fetching models")}: ${error.message}`, "Qoder import");
     } finally {
       setImportingQoderModels(false);
     }
@@ -556,6 +558,11 @@ export default function ProviderDetailPage() {
       setOneByOneRunning(false);
       setOneByOneStopping(false);
       stopOneByOneRef.current = false;
+      if (passed === connections.length) {
+        notify.success(`All ${connections.length} connections passed`, "Connection test");
+      } else if (failed > 0) {
+        notify.warning(`${passed}/${connections.length} passed, ${failed} failed`, "Connection test");
+      }
     }
   };
 
@@ -575,9 +582,14 @@ export default function ProviderDetailPage() {
           const res = await fetch(`/api/providers/${id}`, { method: "DELETE" });
           if (res.ok) {
             setConnections(connections.filter(c => c.id !== id));
+            notify.success("Connection deleted", "Providers");
+          } else {
+            const data = await res.json().catch(() => ({}));
+            notify.error(data.error || "Failed to delete connection", "Providers");
           }
         } catch (error) {
           console.log("Error deleting connection:", error);
+          notify.error("Failed to delete connection", "Providers");
         }
       }
     });
@@ -885,177 +897,18 @@ export default function ProviderDetailPage() {
       const data = await res.json();
       setModelTestResults((prev) => ({ ...prev, [modelId]: data.ok ? "ok" : "error" }));
       setModelsTestError(data.ok ? "" : (data.error || "Model not reachable"));
+      if (data.ok) {
+        notify.success(`${providerDisplayAlias}/${modelId} is reachable`, "Model test");
+      } else {
+        notify.error(data.error || "Model not reachable", "Model test");
+      }
     } catch {
       setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
       setModelsTestError("Network error");
+      notify.error("Network error", "Model test");
     } finally {
       setTestingModelId(null);
     }
-  };
-
-  const renderModelsSection = () => {
-    if (isCompatible) {
-      return (
-        <CompatibleModelsSection
-          providerStorageAlias={providerStorageAlias}
-          providerDisplayAlias={providerDisplayAlias}
-          modelAliases={modelAliases}
-          copied={copied}
-          onCopy={copy}
-          onSetAlias={handleSetAlias}
-          onDeleteAlias={handleDeleteAlias}
-          connections={connections}
-          isAnthropic={isAnthropicCompatible}
-        />
-      );
-    }
-    // Combine hardcoded models with Kilo free models (deduplicated)
-    // Exclude non-llm models (embedding, tts, etc.) — they have dedicated pages under media-providers
-    const allModels = [
-      ...models,
-      ...kiloFreeModels.filter((fm) => !models.some((m) => m.id === fm.id)),
-    ].filter((m) => !m.type || m.type === "llm");
-    const disabledSet = new Set(disabledModelIds);
-    const displayModels = allModels.filter((m) => !disabledSet.has(m.id));
-    const disabledDisplayModels = allModels.filter((m) => disabledSet.has(m.id));
-    // Custom models added by user (stored as aliases: modelId → providerAlias/modelId)
-    const customModels = Object.entries(modelAliases)
-      .filter(([alias, fullModel]) => {
-        const prefix = `${providerStorageAlias}/`;
-        if (!fullModel.startsWith(prefix)) return false;
-        const modelId = fullModel.slice(prefix.length);
-        // Only show if not already in hardcoded list
-        // For passthroughModels, include all aliases (model IDs may contain slashes like "anthropic/claude-3")
-        if (providerInfo.passthroughModels) return !models.some((m) => m.id === modelId);
-        return !models.some((m) => m.id === modelId) && alias === modelId;
-      })
-      .map(([alias, fullModel]) => ({
-        id: fullModel.slice(`${providerStorageAlias}/`.length),
-        alias,
-        fullModel,
-      }));
-
-    return (
-      <div className="flex flex-wrap gap-3">
-        {/* Custom models first */}
-        {customModels.map((model) => (
-          <ModelRow
-            key={model.id}
-            model={{ id: model.id }}
-            fullModel={`${providerDisplayAlias}/${model.id}`}
-            alias={model.alias}
-            copied={copied}
-            onCopy={copy}
-            onSetAlias={() => {}}
-            onDeleteAlias={() => handleDeleteAlias(model.alias)}
-            testStatus={modelTestResults[model.id]}
-            onTest={connections.length > 0 || isFreeNoAuth ? () => handleTestModel(model.id) : undefined}
-            isTesting={testingModelId === model.id}
-            isCustom
-            isFree={false}
-          />
-        ))}
-
-        {displayModels.map((model) => {
-          const fullModel = `${providerStorageAlias}/${model.id}`;
-          const oldFormatModel = `${providerId}/${model.id}`;
-          const existingAlias = Object.entries(modelAliases).find(
-            ([, m]) => m === fullModel || m === oldFormatModel
-          )?.[0];
-          return (
-            <ModelRow
-              key={model.id}
-              model={model}
-              fullModel={`${providerDisplayAlias}/${model.id}`}
-              alias={existingAlias}
-              copied={copied}
-              onCopy={copy}
-              onSetAlias={(alias) => handleSetAlias(model.id, alias, providerStorageAlias)}
-              onDeleteAlias={() => handleDeleteAlias(existingAlias)}
-              testStatus={modelTestResults[model.id]}
-              onTest={connections.length > 0 || isFreeNoAuth ? () => handleTestModel(model.id) : undefined}
-              isTesting={testingModelId === model.id}
-              isFree={model.isFree}
-              onDisable={() => handleDisableModel(model.id)}
-            />
-          );
-        })}
-
-        {/* Add model button — inline, same style as model chips */}
-        <button
-          onClick={() => setShowAddCustomModel(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-3 py-2 text-xs text-primary transition-colors hover:border-primary hover:bg-primary/5 sm:w-auto"
-        >
-          <span className="material-symbols-outlined text-sm">add</span>
-          Add Model
-        </button>
-
-        {/* Import Qoder models button — only show for qoder provider */}
-        {providerId === "qoder" && connections.some((conn) => conn.isActive !== false) && (
-          <button
-            onClick={handleImportQoderModels}
-            disabled={importingQoderModels}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-blue-500/40 px-3 py-2 text-xs text-blue-600 dark:text-blue-400 transition-colors hover:border-blue-500 hover:bg-blue-500/5 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="material-symbols-outlined text-sm" style={importingQoderModels ? { animation: "spin 1s linear infinite" } : undefined}>
-              {importingQoderModels ? "progress_activity" : "download"}
-            </span>
-            {importingQoderModels ? translate("Fetching...") : translate("Fetch Qoder Models")}
-          </button>
-        )}
-
-        {/* Suggested models from provider API — show only models not yet added */}
-        {suggestedModels.length > 0 && (() => {
-          const addedFullModels = new Set(Object.values(modelAliases));
-          const hardcodedIds = new Set(models.map((m) => m.id));
-          const notAdded = suggestedModels.filter(
-            (m) => !addedFullModels.has(`${providerStorageAlias}/${m.id}`) && !hardcodedIds.has(m.id)
-          );
-          if (notAdded.length === 0) return null;
-          return (
-            <div className="w-full mt-2">
-              <p className="text-xs text-text-muted mb-2">Suggested free models (≥200k context):</p>
-              <div className="flex flex-wrap gap-2">
-                {notAdded.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={async () => {
-                      const alias = m.id.split("/").pop();
-                      await handleSetAlias(m.id, alias, providerStorageAlias);
-                    }}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs text-text-muted hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-colors"
-                    title={`${m.name} · ${(m.contextLength / 1000).toFixed(0)}k ctx`}
-                  >
-                    <span className="material-symbols-outlined text-[13px]">add</span>
-                    {m.id.split("/").pop()}
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Disabled models — restorable */}
-        {disabledDisplayModels.length > 0 && (
-          <div className="w-full mt-2">
-            <p className="text-xs text-text-muted mb-2">Disabled models ({disabledDisplayModels.length}):</p>
-            <div className="flex flex-wrap gap-2">
-              {disabledDisplayModels.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => handleEnableModel(m.id)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 text-xs text-text-muted hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-colors"
-                  title="Restore model"
-                >
-                  <span className="material-symbols-outlined text-[13px]">add</span>
-                  {m.id}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
   };
 
   if (loading) {
@@ -1123,7 +976,6 @@ export default function ProviderDetailPage() {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">{providerInfo.name}</h1>
               {(providerInfo.notice?.apiKeyUrl || providerInfo.notice?.signupUrl || providerInfo.website) && (
                 <a
                   href={providerInfo.notice?.apiKeyUrl || providerInfo.notice?.signupUrl || providerInfo.website}
@@ -1144,10 +996,7 @@ export default function ProviderDetailPage() {
       </div>
 
       {providerInfo.deprecated && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-          <span className="material-symbols-outlined text-[16px] text-yellow-500 mt-0.5 shrink-0">warning</span>
-          <p className="text-xs text-red-600 dark:text-yellow-400 leading-relaxed">{providerInfo.deprecationNotice}</p>
-        </div>
+        <GlassAlert variant="warning" hideIcon message={providerInfo.deprecationNotice} />
       )}
 
       {providerInfo.notice?.text && !providerInfo.deprecated && (
@@ -1211,10 +1060,15 @@ export default function ProviderDetailPage() {
                       try {
                         const res = await fetch(`/api/provider-nodes/${providerId}`, { method: "DELETE" });
                         if (res.ok) {
+                          notify.success("Compatible provider deleted", "Providers");
                           router.push("/dashboard/providers");
+                        } else {
+                          const data = await res.json().catch(() => ({}));
+                          notify.error(data.error || "Failed to delete provider", "Providers");
                         }
                       } catch (error) {
                         console.log("Error deleting provider node:", error);
+                        notify.error("Failed to delete provider", "Providers");
                       }
                     }
                   });
@@ -1441,36 +1295,42 @@ export default function ProviderDetailPage() {
 
       {/* Models */}
       <Card>
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold">
-            {"Available Models"}
-          </h2>
-          {!isCompatible && (() => {
-            const allIds = [
-              ...models,
-              ...kiloFreeModels.filter((fm) => !models.some((m) => m.id === fm.id)),
-            ].filter((m) => !m.type || m.type === "llm").map((m) => m.id);
-            const activeIds = allIds.filter((id) => !disabledModelIds.includes(id));
-            return (
-              <div className="flex gap-2">
-                {disabledModelIds.length > 0 && (
-                  <Button size="sm" variant="secondary" icon="restart_alt" onClick={handleEnableAll}>
-                    Active All
-                  </Button>
-                )}
-                {activeIds.length > 0 && (
-                  <Button size="sm" variant="secondary" icon="block" onClick={() => handleDisableAll(activeIds)}>
-                    Disable All
-                  </Button>
-                )}
-              </div>
-            );
-          })()}
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold">Available Models</h2>
+          <p className="text-sm text-text-muted mt-1">
+            Search, filter, and bulk-manage models for this provider.
+          </p>
         </div>
-        {!!modelsTestError && (
-          <p className="text-xs text-red-500 mb-3 break-words">{modelsTestError}</p>
-        )}
-        {renderModelsSection()}
+        <ModelsManagerPanel
+          isCompatible={isCompatible}
+          providerId={providerId}
+          providerInfo={providerInfo}
+          providerStorageAlias={providerStorageAlias}
+          providerDisplayAlias={providerDisplayAlias}
+          models={models}
+          kiloFreeModels={kiloFreeModels}
+          disabledModelIds={disabledModelIds}
+          modelAliases={modelAliases}
+          modelTestResults={modelTestResults}
+          testingModelId={testingModelId}
+          modelsTestError={modelsTestError}
+          connections={connections}
+          isFreeNoAuth={isFreeNoAuth}
+          suggestedModels={suggestedModels}
+          copied={copied}
+          onCopy={copy}
+          onSetAlias={handleSetAlias}
+          onDeleteAlias={handleDeleteAlias}
+          onTestModel={handleTestModel}
+          onDisableModel={handleDisableModel}
+          onEnableModel={handleEnableModel}
+          onEnableAll={handleEnableAll}
+          onDisableAll={handleDisableAll}
+          onAddCustomModel={() => setShowAddCustomModel(true)}
+          onImportQoderModels={handleImportQoderModels}
+          importingQoderModels={importingQoderModels}
+          isAnthropicCompatible={isAnthropicCompatible}
+        />
       </Card>
 
       {bulkActionModal}

@@ -1,29 +1,35 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Card, Button, Toggle, Input } from "@/shared/components";
+
+import { Button, Toggle, Input, GlassAlert, SettingsSection, BackupSectionsModal } from "@/shared/components";
 import Modal, { ConfirmModal } from "@/shared/components/Modal";
+import {
+  detectBackupSections,
+  summarizeBackupPayload,
+} from "@/lib/db/backupSections";
 import LanguageSwitcher from "@/shared/components/LanguageSwitcher";
 import { useTheme } from "@/shared/hooks/useTheme";
 import { cn } from "@/shared/utils/cn";
 import { APP_CONFIG } from "@/shared/constants/config";
-import { LOCALE_COOKIE, normalizeLocale } from "@/i18n/config";
-import { LOCALE_FLAGS } from "@/shared/constants/locales";
+import { LOCALE_COOKIE, DEFAULT_LOCALE, normalizeLocale } from "@/i18n/config";
+import LocaleFlag from "@/shared/components/LocaleFlag";
+import { getLocaleDisplayName } from "@/shared/constants/locales";
+import { useNotificationStore } from "@/store/notificationStore";
 
 function getLocaleFromCookie() {
-  if (typeof document === "undefined") return "en";
+  if (typeof document === "undefined") return DEFAULT_LOCALE;
   const cookie = document.cookie
     .split(";")
     .find((c) => c.trim().startsWith(`${LOCALE_COOKIE}=`));
-  const value = cookie ? decodeURIComponent(cookie.split("=")[1]) : "en";
+  const value = cookie ? decodeURIComponent(cookie.split("=")[1]) : DEFAULT_LOCALE;
   return normalizeLocale(value);
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
   const { theme, setTheme, isDark } = useTheme();
-  const [locale, setLocale] = useState("en");
+  const notify = useNotificationStore();
+  const [locale, setLocale] = useState(DEFAULT_LOCALE);
   const [langOpen, setLangOpen] = useState(false);
   const [shutdownOpen, setShutdownOpen] = useState(false);
   const [isShuttingDown, setIsShuttingDown] = useState(false);
@@ -34,8 +40,17 @@ export default function ProfilePage() {
   const [passLoading, setPassLoading] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbStatus, setDbStatus] = useState({ type: "", message: "" });
-  const [dbAuth, setDbAuth] = useState({ open: false, mode: "", password: "" });
+
+  const [backupPicker, setBackupPicker] = useState({
+    open: false,
+    mode: "",
+    summary: [],
+    fileName: "",
+    initialSections: [],
+  });
   const pendingImportRef = useRef(null);
+  const pendingImportOptionsRef = useRef(null);
+  const pendingExportSectionsRef = useRef(null);
   const [oidcForm, setOidcForm] = useState({
     authMode: "password",
     oidcIssuerUrl: "",
@@ -385,7 +400,9 @@ export default function ProfilePage() {
     const secret = oidcClientSecret.trim();
 
     if (!issuerUrl || !clientId) {
-      setOidcTestStatus({ type: "error", message: "Issuer URL and client ID are required to test the connection." });
+      const message = "Issuer URL and client ID are required to test the connection.";
+      setOidcTestStatus({ type: "error", message });
+      notify.error(message, "OIDC test");
       return;
     }
 
@@ -409,10 +426,9 @@ export default function ProfilePage() {
 
       const saved = await saveRes.json().catch(() => ({}));
       if (!saveRes.ok) {
-        setOidcTestStatus({
-          type: "error",
-          message: saved.error || "Failed to save OIDC settings before testing",
-        });
+        const message = saved.error || "Failed to save OIDC settings before testing";
+        setOidcTestStatus({ type: "error", message });
+        notify.error(message, "OIDC test");
         return;
       }
 
@@ -437,11 +453,15 @@ export default function ProfilePage() {
           type: "success",
           message: statusMessage,
         });
+        notify.success(statusMessage, "OIDC test");
       } else {
-        setOidcTestStatus({ type: "error", message: data.error || "OIDC connection test failed" });
+        const message = data.error || "OIDC connection test failed";
+        setOidcTestStatus({ type: "error", message });
+        notify.error(message, "OIDC test");
       }
     } catch (err) {
       setOidcTestStatus({ type: "error", message: "An error occurred" });
+      notify.error("An error occurred", "OIDC test");
     } finally {
       setOidcTestLoading(false);
     }
@@ -473,13 +493,15 @@ export default function ProfilePage() {
     }
   };
 
-  const handleExportDatabase = async (password) => {
+  const handleExportDatabase = async () => {
+    const sections = pendingExportSectionsRef.current;
+    if (!sections?.length) return;
+
     setDbLoading(true);
     setDbStatus({ type: "", message: "" });
     try {
-      const res = await fetch("/api/settings/database", {
-        headers: { "x-9r-password": password },
-      });
+      const query = new URLSearchParams({ sections: sections.join(",") });
+      const res = await fetch(`/api/settings/database?${query.toString()}`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to export database");
@@ -498,35 +520,88 @@ export default function ProfilePage() {
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
 
-      setDbStatus({ type: "success", message: "Database backup downloaded" });
+      setDbStatus({
+        type: "success",
+        message: `Backup downloaded (${sections.length} categories)`,
+      });
     } catch (err) {
       setDbStatus({ type: "error", message: err.message || "Failed to export database" });
+    } finally {
+      pendingExportSectionsRef.current = null;
+      setDbLoading(false);
+    }
+  };
+
+  const openExportPicker = () => {
+    setDbStatus({ type: "", message: "" });
+    setBackupPicker({
+      open: true,
+      mode: "export",
+      summary: [],
+      fileName: "",
+      initialSections: [],
+    });
+  };
+
+  const handleImportDatabase = async (event) => {
+    const file = event.target.files?.[0];
+    if (importFileRef.current) importFileRef.current.value = "";
+    if (!file) return;
+
+    setDbStatus({ type: "", message: "" });
+    setDbLoading(true);
+
+    try {
+      const raw = await file.text();
+      const payload = JSON.parse(raw);
+      const availableSections = detectBackupSections(payload);
+
+      pendingImportRef.current = payload;
+      setBackupPicker({
+        open: true,
+        mode: "import",
+        summary: summarizeBackupPayload(payload),
+        fileName: file.name,
+        initialSections: availableSections,
+      });
+    } catch (err) {
+      setDbStatus({ type: "error", message: err.message || "Invalid backup file" });
+      pendingImportRef.current = null;
     } finally {
       setDbLoading(false);
     }
   };
 
-  const handleImportDatabase = (event) => {
-    const file = event.target.files?.[0];
-    if (importFileRef.current) importFileRef.current.value = "";
-    if (!file) return;
-    pendingImportRef.current = file;
-    setDbStatus({ type: "", message: "" });
-    setDbAuth({ open: true, mode: "import", password: "" });
+  const handleBackupPickerConfirm = ({ sections, merge, excludeDashboardSettings }) => {
+    const mode = backupPicker.mode;
+    setBackupPicker({ open: false, mode: "", summary: [], fileName: "", initialSections: [] });
+
+    if (mode === "export") {
+      pendingExportSectionsRef.current = sections;
+      handleExportDatabase();
+      return;
+    }
+
+    pendingImportOptionsRef.current = { sections, merge, excludeDashboardSettings };
+    runImportDatabase();
   };
 
-  const runImportDatabase = async (password) => {
-    const file = pendingImportRef.current;
-    if (!file) return;
+  const runImportDatabase = async () => {
+    const payload = pendingImportRef.current;
+    const importOptions = pendingImportOptionsRef.current;
+    if (!payload || !importOptions?.sections?.length) return;
+
     setDbLoading(true);
     try {
-      const raw = await file.text();
-      const payload = JSON.parse(raw);
-
       const res = await fetch("/api/settings/database", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, password }),
+        body: JSON.stringify({
+          ...payload,
+          sections: importOptions.sections,
+          merge: importOptions.merge,
+          excludeDashboardSettings: importOptions.excludeDashboardSettings === true,
+        }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -535,21 +610,18 @@ export default function ProfilePage() {
       }
 
       await reloadSettings();
-      setDbStatus({ type: "success", message: "Database imported successfully" });
+      const actionLabel = importOptions.merge ? "merged into" : "replaced in";
+      setDbStatus({
+        type: "success",
+        message: `${importOptions.sections.length} categories ${actionLabel} your database`,
+      });
     } catch (err) {
       setDbStatus({ type: "error", message: err.message || "Invalid backup file" });
     } finally {
       pendingImportRef.current = null;
+      pendingImportOptionsRef.current = null;
       setDbLoading(false);
     }
-  };
-
-  // Confirm password modal, then run export or import.
-  const handleDbAuthConfirm = async () => {
-    const { mode, password } = dbAuth;
-    setDbAuth({ open: false, mode: "", password: "" });
-    if (mode === "export") await handleExportDatabase(password);
-    else if (mode === "import") await runImportDatabase(password);
   };
 
   const observabilityEnabled = settings.enableObservability === true;
@@ -565,56 +637,48 @@ export default function ProfilePage() {
     setShutdownOpen(false);
   };
 
-  const handleLogout = async () => {
-    try {
-      const res = await fetch("/api/auth/logout", { method: "POST" });
-      if (res.ok) {
-        router.push("/login");
-        router.refresh();
-      }
-    } catch (err) {
-      console.error("Failed to logout:", err);
-    }
-  };
-
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-0">
-      <div className="flex flex-col gap-6">
+    <div className="w-full min-w-0">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 2xl:grid-cols-3 auto-rows-min">
         {/* Local Mode Info */}
-        <Card>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="size-10 sm:size-12 rounded-lg bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-xl sm:text-2xl">computer</span>
-              </div>
-              <div>
-                <h2 className="text-lg sm:text-xl font-semibold">Local Mode</h2>
-                <p className="text-sm text-text-muted">Running on your machine</p>
-              </div>
+        <SettingsSection
+          icon="computer"
+          title="Local Mode"
+          description="Running on your machine"
+        >
+          <div className="flex flex-col gap-2 -mt-2 mb-4">
+            <div>
+              <p className="font-medium text-sm sm:text-base">Appearance</p>
+              <p className="text-xs sm:text-sm text-text-muted">
+                {theme === "system"
+                  ? "Follows your system preference"
+                  : theme === "dark"
+                    ? "Dark mode enabled"
+                    : "Light mode enabled"}
+              </p>
             </div>
-            <div className="inline-flex p-1 rounded-lg bg-black/5 dark:bg-white/5 w-full sm:w-auto">
+            <div className="glass-segmented w-full">
               {["light", "dark", "system"].map((option) => (
                 <button
                   key={option}
                   type="button"
                   onClick={() => setTheme(option)}
                   className={cn(
-                    "flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md font-medium transition-all flex-1 sm:flex-initial",
-                    theme === option
-                      ? "bg-white dark:bg-white/10 text-text-main shadow-sm"
-                      : "text-text-muted hover:text-text-main"
+                    "glass-segmented-item gsap-pressable min-w-0",
+                    theme === option && "glass-segmented-item-active"
                   )}
+                  data-pressable
                 >
-                  <span className="material-symbols-outlined text-[18px]">
+                  <span className="material-symbols-outlined text-[18px] shrink-0">
                     {option === "light" ? "light_mode" : option === "dark" ? "dark_mode" : "contrast"}
                   </span>
-                  <span className="capitalize text-xs sm:text-sm">{option}</span>
+                  <span className="capitalize text-xs sm:text-sm truncate">{option}</span>
                 </button>
               ))}
             </div>
           </div>
-          <div className="flex flex-col gap-3 pt-4 border-t border-border">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg bg-bg border border-border gap-2">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-xl glass-panel-subtle gap-2">
               <div>
                 <p className="font-medium text-sm sm:text-base">Database Location</p>
                 <p className="text-xs sm:text-sm text-text-muted font-mono break-all">~/.9router/db/data.sqlite</p>
@@ -624,7 +688,7 @@ export default function ProfilePage() {
               <Button
                 variant="secondary"
                 icon="download"
-                onClick={() => setDbAuth({ open: true, mode: "export", password: "" })}
+                onClick={openExportPicker}
                 loading={dbLoading}
                 className="w-full sm:w-auto"
               >
@@ -648,40 +712,37 @@ export default function ProfilePage() {
               />
             </div>
             {dbStatus.message && (
-              <p className={`text-sm ${dbStatus.type === "error" ? "text-red-500" : "text-green-600 dark:text-green-400"}`}>
-                {dbStatus.message}
-              </p>
+              <GlassAlert
+                variant={dbStatus.type === "error" ? "error" : "success"}
+                message={dbStatus.message}
+              />
             )}
           </div>
-        </Card>
+        </SettingsSection>
 
         {/* Language */}
-        <Card>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="size-10 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[20px]">language</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-semibold">Language</h3>
-          </div>
+        <SettingsSection icon="language" title="Language" description="Display language for the dashboard">
           <button
+            type="button"
             onClick={() => setLangOpen(true)}
-            className="flex items-center justify-between w-full p-3 rounded-lg bg-bg border border-border hover:border-primary/50 transition-colors"
+            className="glass-option flex items-center justify-between w-full -mt-2"
             data-i18n-skip="true"
           >
             <span className="text-sm text-text-muted">Display language</span>
-            <span className="text-2xl">{LOCALE_FLAGS[locale] || "🌐"}</span>
+            <span className="flex items-center gap-2.5" data-i18n-skip="true">
+              <LocaleFlag locale={locale} size="lg" />
+              <span className="text-sm font-medium text-text-main">{getLocaleDisplayName(locale)}</span>
+            </span>
           </button>
-        </Card>
+        </SettingsSection>
 
         {/* Security */}
-        <Card>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
-              <span className="material-symbols-outlined text-[20px]">shield</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-semibold">Security</h3>
-          </div>
-          <div className="flex flex-col gap-4">
+        <SettingsSection
+          icon="shield"
+          title="Security"
+          description="Password protection and dashboard access"
+        >
+          <div className="flex flex-col gap-4 -mt-2">
             <div className="flex items-start sm:items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm sm:text-base">Require login</p>
@@ -740,9 +801,10 @@ export default function ProfilePage() {
                 </div>
 
                 {passStatus.message && (
-                  <p className={`text-xs sm:text-sm ${passStatus.type === "error" ? "text-red-500" : "text-green-500"}`}>
-                    {passStatus.message}
-                  </p>
+                  <GlassAlert
+                    variant={passStatus.type === "error" ? "error" : "success"}
+                    message={passStatus.message}
+                  />
                 )}
 
                 <div className="pt-2">
@@ -753,30 +815,25 @@ export default function ProfilePage() {
               </form>
             )}
           </div>
-        </Card>
+        </SettingsSection>
 
         {/* OIDC */}
-        <Card>
-          <button
-            type="button"
-            onClick={() => setOidcExpanded((v) => !v)}
-            className="w-full flex items-center gap-3 text-left"
-          >
-            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500 shrink-0">
-              <span className="material-symbols-outlined text-[20px]">lock_open</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-base sm:text-lg font-semibold">OIDC Dashboard Login</h3>
-              <p className="text-xs text-text-muted">
-                {settings.authMode === "oidc" ? "OIDC active" : settings.authMode === "both" ? "Password + OIDC active" : "Optional SSO via Authentik/Keycloak/Google"}
-              </p>
-            </div>
-            <span className="material-symbols-outlined text-text-muted shrink-0">
-              {oidcExpanded ? "expand_less" : "expand_more"}
-            </span>
-          </button>
-          {oidcExpanded && (
-          <div className="flex flex-col gap-4 mt-4">
+        <SettingsSection
+          className="xl:col-span-2 2xl:col-span-3"
+          icon="lock_open"
+          title="OIDC Dashboard Login"
+          description={
+            settings.authMode === "oidc"
+              ? "OIDC active"
+              : settings.authMode === "both"
+                ? "Password + OIDC active"
+                : "Optional SSO via Authentik/Keycloak/Google"
+          }
+          collapsible
+          expanded={oidcExpanded}
+          onToggle={() => setOidcExpanded((v) => !v)}
+        >
+          <div className="flex flex-col gap-4 -mt-2">
             <p className="text-xs sm:text-sm text-text-muted">
               Use Authentik or any OIDC provider to sign in to the dashboard. You can enable password-only, OIDC-only, or both for the dashboard; model API access still uses API keys.
             </p>
@@ -808,10 +865,8 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => updateOidcForm("authMode", option.value)}
                       className={cn(
-                        "text-left rounded-lg border p-3 transition-colors",
-                        active
-                          ? "border-primary bg-primary/5"
-                          : "border-border bg-bg hover:bg-black/5 dark:hover:bg-white/5"
+                        "glass-option",
+                        active && "glass-option-active"
                       )}
                       disabled={loading || oidcLoading}
                     >
@@ -877,7 +932,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-border bg-bg p-3 text-xs sm:text-sm text-text-muted">
+            <div className="glass-panel-subtle rounded-xl p-3 text-xs sm:text-sm text-text-muted">
               <p className="font-medium text-text-main mb-1">Redirect URI</p>
               <code className="block break-all font-mono">{oidcRedirectUri}</code>
             </div>
@@ -892,41 +947,42 @@ export default function ProfilePage() {
             </div>
 
             {oidcTestStatus.message && (
-              <p className={`text-xs sm:text-sm ${oidcTestStatus.type === "error" ? "text-red-500" : "text-green-500"}`}>
-                {oidcTestStatus.message}
-              </p>
+              <GlassAlert
+                variant={oidcTestStatus.type === "error" ? "error" : "success"}
+                message={oidcTestStatus.message}
+              />
             )}
 
             {oidcStatus.message && (
-              <p className={`text-xs sm:text-sm ${oidcStatus.type === "error" ? "text-red-500" : "text-green-500"}`}>
-                {oidcStatus.message}
-              </p>
+              <GlassAlert
+                variant={oidcStatus.type === "error" ? "error" : "success"}
+                message={oidcStatus.message}
+              />
             )}
 
             {settings.authMode === "oidc" && (
-              <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400">
-                OIDC login is currently active. Password login is disabled until you switch back.
-              </p>
+              <GlassAlert
+                variant="warning"
+                message="OIDC login is currently active. Password login is disabled until you switch back."
+              />
             )}
 
             {settings.authMode === "both" && (
-              <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400">
-                Password and OIDC login are both active.
-              </p>
+              <GlassAlert
+                variant="info"
+                message="Password and OIDC login are both active."
+              />
             )}
           </div>
-          )}
-        </Card>
+        </SettingsSection>
 
         {/* Routing Preferences */}
-        <Card>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 shrink-0">
-              <span className="material-symbols-outlined text-[20px]">route</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-semibold">Routing Strategy</h3>
-          </div>
-          <div className="flex flex-col gap-4">
+        <SettingsSection
+          icon="route"
+          title="Routing Strategy"
+          description="How requests are distributed across accounts and combos"
+        >
+          <div className="flex flex-col gap-4 -mt-2">
             <div className="flex items-start sm:items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm sm:text-base">Round Robin</p>
@@ -1007,18 +1063,15 @@ export default function ProfilePage() {
                 : " Combos always start with their first model."}
             </p>
           </div>
-        </Card>
+        </SettingsSection>
 
         {/* Network */}
-        <Card>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 shrink-0">
-              <span className="material-symbols-outlined text-[20px]">wifi</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-semibold">Network</h3>
-          </div>
-
-          <div className="flex flex-col gap-4">
+        <SettingsSection
+          icon="wifi"
+          title="Network"
+          description="Outbound proxy for OAuth and provider requests"
+        >
+          <div className="flex flex-col gap-4 -mt-2">
             <div className="flex items-start sm:items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm sm:text-base">Outbound Proxy</p>
@@ -1074,22 +1127,21 @@ export default function ProfilePage() {
             )}
 
             {proxyStatus.message && (
-              <p className={`text-xs sm:text-sm ${proxyStatus.type === "error" ? "text-red-500" : "text-green-500"} pt-2 border-t border-border/50`}>
-                {proxyStatus.message}
-              </p>
+              <GlassAlert
+                variant={proxyStatus.type === "error" ? "error" : "success"}
+                message={proxyStatus.message}
+              />
             )}
           </div>
-        </Card>
+        </SettingsSection>
 
         {/* Observability Settings */}
-        <Card>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500 shrink-0">
-              <span className="material-symbols-outlined text-[20px]">monitoring</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-semibold">Observability</h3>
-          </div>
-          <div className="flex items-start sm:items-center justify-between gap-4">
+        <SettingsSection
+          icon="monitoring"
+          title="Observability"
+          description="Request logging and inspection"
+        >
+          <div className="flex items-start sm:items-center justify-between gap-4 -mt-2">
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm sm:text-base">Enable Observability</p>
               <p className="text-xs sm:text-sm text-text-muted">
@@ -1102,31 +1154,38 @@ export default function ProfilePage() {
               disabled={loading}
             />
           </div>
-        </Card>
+        </SettingsSection>
 
-        {/* Account actions */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button
-            variant="outline"
-            fullWidth
-            icon="power_settings_new"
-            onClick={() => setShutdownOpen(true)}
-            className="text-red-500 border-red-200 hover:bg-red-50 hover:border-red-300"
-          >
-            Shutdown
-          </Button>
-          <Button
-            variant="outline"
-            fullWidth
-            icon="logout"
-            onClick={handleLogout}
-          >
-            Logout
-          </Button>
-        </div>
+        {/* Server control */}
+        <SettingsSection
+          className="xl:col-span-2 2xl:col-span-3"
+          icon="power_settings_new"
+          title="Server"
+          description="Stop the 9Router proxy process"
+        >
+          <div className="-mt-2 rounded-xl border border-danger/20 bg-danger/5 p-4 sm:p-5">
+            <p className="text-sm text-text-muted leading-relaxed max-w-2xl">
+              Shuts down the running instance. If PM2 or systemd is configured with auto-restart,
+              the process may come back online automatically.
+            </p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button
+                variant="outline"
+                icon="power_settings_new"
+                onClick={() => setShutdownOpen(true)}
+                className="w-full sm:w-auto text-danger border-danger/30 hover:bg-danger/10 hover:border-danger/40"
+              >
+                Shutdown server
+              </Button>
+              <p className="text-xs text-text-subtle">
+                Sign out is available from your profile menu in the top bar.
+              </p>
+            </div>
+          </div>
+        </SettingsSection>
 
         {/* App Info */}
-        <div className="text-center text-xs sm:text-sm text-text-muted py-4">
+        <div className="text-center text-xs sm:text-sm text-text-muted py-4 xl:col-span-2 2xl:col-span-3">
           <p>{APP_CONFIG.name} v{APP_CONFIG.version}</p>
           <p className="mt-1">Local Mode - All data stored on your machine</p>
         </div>
@@ -1152,34 +1211,20 @@ export default function ProfilePage() {
         loading={isShuttingDown}
       />
 
-      <Modal
-        isOpen={dbAuth.open}
-        onClose={() => setDbAuth({ open: false, mode: "", password: "" })}
-        title="Confirm Password"
-        size="sm"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setDbAuth({ open: false, mode: "", password: "" })} disabled={dbLoading}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleDbAuthConfirm} loading={dbLoading} disabled={!dbAuth.password}>
-              Confirm
-            </Button>
-          </>
-        }
-      >
-        <p className="text-text-muted mb-3 text-sm">
-          Enter your current password to {dbAuth.mode === "export" ? "export" : "import"} the database.
-        </p>
-        <Input
-          type="password"
-          value={dbAuth.password}
-          onChange={(e) => setDbAuth((s) => ({ ...s, password: e.target.value }))}
-          onKeyDown={(e) => { if (e.key === "Enter" && dbAuth.password) handleDbAuthConfirm(); }}
-          placeholder="Current password"
-          autoFocus
-        />
-      </Modal>
+      <BackupSectionsModal
+        isOpen={backupPicker.open}
+        onClose={() => {
+          setBackupPicker({ open: false, mode: "", summary: [], fileName: "", initialSections: [] });
+          if (backupPicker.mode === "import") pendingImportRef.current = null;
+        }}
+        onConfirm={handleBackupPickerConfirm}
+        mode={backupPicker.mode || "export"}
+        summary={backupPicker.summary}
+        initialSections={backupPicker.initialSections}
+        fileName={backupPicker.fileName}
+        loading={dbLoading}
+      />
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, Button, Badge, Input, ModelSelectModal } from "@/shared/components";
+import { Card, Button, Badge, Input, Modal, ModelSelectModal, GlassAlert } from "@/shared/components";
 import { TOOL_HOSTS } from "@/shared/constants/mitmToolHosts";
 import Image from "next/image";
 
@@ -184,7 +184,7 @@ export default function MitmToolCard({
               <p>Toggle DNS to redirect {tool.name} traffic through 9Router via MITM.</p>
               {!dnsActive && (
                 <p className="text-amber-600 text-[10px] mt-1">
-                  ⚠️ Enable DNS to edit model mappings
+                  Enable DNS to edit model mappings
                 </p>
               )}
             </div>
@@ -269,39 +269,49 @@ export default function MitmToolCard({
         )}
       </Card>
 
-      {/* Password Modal */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="mx-4 flex w-full max-w-sm flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-xl sm:p-6">
-            <h3 className="font-semibold text-text-main">Sudo Password Required</h3>
-            <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <span className="material-symbols-outlined text-yellow-500 text-[20px]">warning</span>
-              <p className="text-xs text-text-muted">Required to modify /etc/hosts and flush DNS cache</p>
-            </div>
-            <Input
-              type="password"
-              placeholder="Enter sudo password"
-              value={sudoPassword}
-              onChange={(e) => setSudoPassword(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !loading) handleConfirmPassword(); }}
-            />
-            {modalError && (
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded text-xs bg-red-500/10 text-red-600">
-                <span className="material-symbols-outlined text-[14px]">error</span>
-                <span>{modalError}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => { setShowPasswordModal(false); setSudoPassword(""); setModalError(null); }} disabled={loading}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleConfirmPassword} loading={loading}>
-                Confirm
-              </Button>
-            </div>
-          </div>
+      <Modal
+        isOpen={showPasswordModal}
+        title="Sudo Password Required"
+        onClose={() => {
+          setShowPasswordModal(false);
+          setSudoPassword("");
+          setModalError(null);
+        }}
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowPasswordModal(false);
+                setSudoPassword("");
+                setModalError(null);
+              }}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleConfirmPassword} loading={loading}>
+              Confirm
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <GlassAlert variant="warning" hideIcon message="Required to modify /etc/hosts and flush DNS cache" />
+          <Input
+            type="password"
+            placeholder="Enter sudo password"
+            value={sudoPassword}
+            onChange={(e) => setSudoPassword(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !loading) handleConfirmPassword(); }}
+          />
+          {modalError && (
+            <GlassAlert variant="error" hideIcon message={modalError} />
+          )}
         </div>
-      )}
+      </Modal>
 
       {/* Model Select Modal */}
       <ModelSelectModal

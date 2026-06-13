@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import PropTypes from "prop-types";
-import { Modal, Button, Input } from "@/shared/components";
+import { Modal, Button, TextArea } from "@/shared/components";
 
 /**
  * iFlow Cookie Authentication Modal
@@ -60,7 +60,9 @@ export default function IFlowCookieModal({ isOpen, onSuccess, onClose }) {
       <div className="space-y-4">
         {success ? (
           <div className="text-center py-8">
-            <div className="text-6xl mb-4">✅</div>
+            <div className="size-16 mx-auto mb-4 rounded-full bg-success/10 flex items-center justify-center">
+              <span className="material-symbols-outlined text-3xl text-success">check_circle</span>
+            </div>
             <p className="text-lg font-medium text-text-primary">Authentication Successful!</p>
             <p className="text-sm text-text-muted mt-2">Fresh API key obtained</p>
           </div>
@@ -90,19 +92,14 @@ export default function IFlowCookieModal({ isOpen, onSuccess, onClose }) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-primary">
-                Cookie String
-              </label>
-              <textarea
-                value={cookie}
-                onChange={(e) => setCookie(e.target.value)}
-                placeholder="BXAuth=xxx; ..."
-                className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                rows={4}
-                disabled={loading}
-              />
-            </div>
+            <TextArea
+              label="Cookie String"
+              value={cookie}
+              onChange={(e) => setCookie(e.target.value)}
+              placeholder="BXAuth=xxx; ..."
+              rows={5}
+              disabled={loading}
+            />
 
             {error && (
               <div className="p-3 bg-error/10 border border-error/20 rounded-lg">

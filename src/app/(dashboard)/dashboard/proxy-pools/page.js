@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { Badge, Button, Card, CardSkeleton, Input, Modal, Toggle, ConfirmModal } from "@/shared/components";
+import { Badge, Button, Card, Input, Modal, Toggle, ConfirmModal, EmptyState, TextArea } from "@/shared/components";
+import PageContentSkeleton from "@/shared/components/PageContentSkeleton";
 import { useNotificationStore } from "@/store/notificationStore";
 
 function getStatusVariant(status) {
@@ -563,22 +564,9 @@ export default function ProxyPoolsPage() {
     [proxyPools]
   );
 
-  if (loading) {
-    return (
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-1 sm:gap-6 sm:px-0">
-        <CardSkeleton />
-        <CardSkeleton />
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-1 sm:gap-6 sm:px-0">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold sm:text-2xl">Proxy Pools</h1>
-        </div>
-
+    <div className="flex w-full min-w-0 flex-col gap-4 px-1 sm:gap-6 sm:px-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-end">
         <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
           <div className="relative" ref={relayMenuRef}>
             <Button
@@ -632,10 +620,13 @@ export default function ProxyPoolsPage() {
           <Button size="sm" variant="secondary" icon="upload" onClick={openBatchImportModal}>
             Batch Import
           </Button>
-          <Button size="sm" icon="add" onClick={openCreateModal}>Add Proxy Pool</Button>
+          <Button size="sm" icon="add" onClick={openCreateModal} disabled={loading}>Add Proxy Pool</Button>
         </div>
       </div>
 
+      {loading ? (
+        <PageContentSkeleton rows={2} />
+      ) : (
       <Card>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {proxyPools.length > 0 && (
@@ -689,13 +680,12 @@ export default function ProxyPoolsPage() {
         )}
 
         {proxyPools.length === 0 ? (
-          <div className="text-center py-10">
-            <p className="text-text-main font-medium mb-1">No proxy pool entries yet</p>
-            <p className="text-sm text-text-muted mb-4">
-              Create a proxy pool entry, then assign it to connections.
-            </p>
-            <Button icon="add" onClick={openCreateModal}>Add Proxy Pool</Button>
-          </div>
+          <EmptyState
+            icon="lan"
+            title="No proxy pool entries yet"
+            description="Create a proxy pool entry, then assign it to connections."
+            action={{ label: "Add Proxy Pool", icon: "add", onClick: openCreateModal }}
+          />
         ) : (
           <div className="flex flex-col divide-y divide-black/[0.04] dark:divide-white/[0.05]">
             {proxyPools.map((pool) => (
@@ -777,6 +767,7 @@ export default function ProxyPoolsPage() {
           </div>
         )}
       </Card>
+      )}
 
       <Modal
         isOpen={showBatchImportModal}
@@ -784,18 +775,15 @@ export default function ProxyPoolsPage() {
         onClose={closeBatchImportModal}
       >
         <div className="flex flex-col gap-4">
-          <div>
-            <label className="text-sm font-medium text-text-main mb-1 block">Paste Proxy List (One per line)</label>
-            <textarea
-              value={batchImportText}
-              onChange={(e) => setBatchImportText(e.target.value)}
-              placeholder={"http://user:pass@127.0.0.1:7897\n127.0.0.1:7897:user:pass"}
-              className="w-full min-h-[180px] py-2 px-3 text-sm text-text-main bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md focus:ring-1 focus:ring-primary/30 focus:border-primary/50 focus:outline-none transition-all"
-            />
-            <p className="text-xs text-text-muted mt-1">
-              Supported formats: protocol://user:pass@host:port, host:port:user:pass
-            </p>
-          </div>
+          <TextArea
+            label="Paste Proxy List (One per line)"
+            value={batchImportText}
+            onChange={(e) => setBatchImportText(e.target.value)}
+            placeholder={"http://user:pass@127.0.0.1:7897\n127.0.0.1:7897:user:pass"}
+            rows={8}
+            textareaClassName="min-h-[11rem] font-mono"
+            hint="Supported formats: protocol://user:pass@host:port, host:port:user:pass"
+          />
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Button fullWidth onClick={handleBatchImport} disabled={!batchImportText.trim() || importing}>

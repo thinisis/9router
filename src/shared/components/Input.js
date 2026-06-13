@@ -1,6 +1,13 @@
 "use client";
 
+import { TextField, Label, Input as HeroInput, FieldError, Description } from "@heroui/react";
 import { cn } from "@/shared/utils/cn";
+
+const SIZE_CLASSES = {
+  sm: "min-h-9 h-9 text-sm",
+  md: "min-h-10 h-10 text-sm",
+  lg: "min-h-11 h-11 text-base",
+};
 
 export default function Input({
   label,
@@ -13,53 +20,53 @@ export default function Input({
   icon,
   disabled = false,
   required = false,
+  fullWidth = true,
+  size = "md",
   className,
   inputClassName,
+  name,
+  id,
+  autoComplete,
   ...props
 }) {
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
+    <TextField
+      className={cn("flex flex-col gap-1.5", fullWidth && "w-full", className)}
+      fullWidth={fullWidth}
+      isInvalid={!!error}
+      isRequired={required}
+      isDisabled={disabled}
+      name={name}
+    >
       {label && (
-        <label className="text-sm font-medium text-text-main">
+        <Label className="text-sm font-medium text-foreground">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+        </Label>
       )}
-      <div className="relative">
+      <div className={cn("relative", fullWidth && "w-full")}>
         {icon && (
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-muted">
+          <div className="absolute inset-y-0 left-0 z-10 flex items-center pl-3 pointer-events-none text-default-400">
             <span className="material-symbols-outlined text-[20px]">{icon}</span>
           </div>
         )}
-        <input
+        <HeroInput
+          id={id}
           type={type}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
-          disabled={disabled}
+          autoComplete={autoComplete}
+          fullWidth={fullWidth}
           className={cn(
-            "w-full py-2.5 px-3 text-sm text-text-main bg-surface-2 rounded-[10px]",
-            "border border-transparent placeholder-text-muted/70",
-            "focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500/40",
-            "transition-all duration-150 ease-out disabled:opacity-50 disabled:cursor-not-allowed",
-            // iOS zoom fix
-            "text-[16px] sm:text-sm",
+            SIZE_CLASSES[size] || SIZE_CLASSES.md,
             icon && "pl-10",
-            error && "ring-1 ring-red-500 focus:ring-2 focus:ring-red-500/40 border-red-500/40",
             inputClassName
           )}
           {...props}
         />
       </div>
-      {error && (
-        <p className="text-xs text-red-500 flex items-center gap-1">
-          <span className="material-symbols-outlined text-[14px]">error</span>
-          {error}
-        </p>
-      )}
-      {hint && !error && (
-        <p className="text-xs text-text-muted">{hint}</p>
-      )}
-    </div>
+      {error && <FieldError>{error}</FieldError>}
+      {hint && !error && <Description>{hint}</Description>}
+    </TextField>
   );
 }

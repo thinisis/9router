@@ -80,3 +80,17 @@ export async function verifyDashboardPassword(password) {
   const initialPassword = process.env.INITIAL_PASSWORD || DEFAULT_PASSWORD;
   return password === initialPassword;
 }
+
+// Database import/export: accept an active dashboard session or password re-auth.
+export async function verifyDatabaseAccess(request, password) {
+  const token = request?.cookies?.get?.("auth_token")?.value;
+  if (token && (await verifyDashboardAuthToken(token))) return true;
+
+  const candidates = [password, request?.headers?.get?.("x-9r-password")];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate && (await verifyDashboardPassword(candidate))) {
+      return true;
+    }
+  }
+  return false;
+}

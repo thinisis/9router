@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import PropTypes from "prop-types";
-import { Button, Modal } from "@/shared/components";
+import { Button, Modal, TextArea } from "@/shared/components";
 import { translate } from "@/i18n/runtime";
 
 const PLACEHOLDER = `[
@@ -92,12 +92,13 @@ export default function BulkImportCodexModal({ isOpen, onClose, onSuccess }) {
           )}
         </p>
 
-        <textarea
-          className="w-full rounded border border-accent/30 bg-sidebar p-2 text-sm font-mono resize-y min-h-[240px] focus:outline-none focus:ring-1 focus:ring-primary"
+        <TextArea
           placeholder={PLACEHOLDER}
           value={jsonText}
           onChange={(e) => setJsonText(e.target.value)}
           disabled={submitting}
+          rows={12}
+          textareaClassName="font-mono min-h-[15rem]"
         />
 
         {parseError && (
@@ -111,8 +112,8 @@ export default function BulkImportCodexModal({ isOpen, onClose, onSuccess }) {
                 result.failed > 0 ? "text-yellow-400" : "text-green-400"
               }`}
             >
-              ✓ {result.success} {translate("added")}
-              {result.failed > 0 ? `, ✗ ${result.failed} ${translate("failed")}` : ""}
+              {result.success} {translate("added")}
+              {result.failed > 0 ? `, ${result.failed} ${translate("failed")}` : ""}
             </div>
             {failedItems.length > 0 && (
               <ul className="rounded border border-accent/20 bg-sidebar/50 p-2 text-xs font-mono max-h-40 overflow-y-auto">

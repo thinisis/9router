@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Button from "./Button";
 import NineRemotePromoModal from "./NineRemotePromoModal";
 
 export default function NineRemoteButton() {
@@ -8,14 +9,16 @@ export default function NineRemoteButton() {
 
   return (
     <>
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
+        icon="computer"
         onClick={() => setIsOpen(true)}
-        className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-text-muted hover:text-text-main hover:bg-black/5 dark:hover:bg-white/5"
         title="9Remote"
+        className="gap-1.5"
       >
-        <span className="material-symbols-outlined text-[18px]">computer</span>
         <span className="text-xs font-medium">Remote</span>
-      </button>
+      </Button>
 
       <NineRemotePromoModal isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </>

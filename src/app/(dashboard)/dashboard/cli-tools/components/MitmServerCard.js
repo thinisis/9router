@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, Button, Badge, Input } from "@/shared/components";
+import { Card, Button, Badge, Input, Modal, GlassAlert } from "@/shared/components";
 
 const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20128";
 
@@ -264,66 +264,83 @@ export default function MitmServerCard({ apiKeys, cloudEnabled, onStatusChange }
         </div>
       </Card>
 
-      {/* Password Modal */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="mx-4 flex w-full max-w-sm flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-xl sm:p-6">
-            <h3 className="font-semibold text-text-main">Sudo Password Required</h3>
-            <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <span className="material-symbols-outlined text-yellow-500 text-[20px]">warning</span>
-              <p className="text-xs text-text-muted">Required for SSL certificate and server startup</p>
-            </div>
-            <Input
-              type="password"
-              placeholder="Enter sudo password"
-              value={sudoPassword}
-              onChange={(e) => setSudoPassword(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !loading) handleConfirmPassword(); }}
-            />
-            {modalError && (
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded text-xs bg-red-500/10 text-red-600">
-                <span className="material-symbols-outlined text-[14px]">error</span>
-                <span>{modalError}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => { setShowPasswordModal(false); setSudoPassword(""); setModalError(null); }} disabled={loading}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleConfirmPassword} loading={loading}>
-                Confirm
-              </Button>
-            </div>
-          </div>
+      <Modal
+        isOpen={showPasswordModal}
+        title="Sudo Password Required"
+        onClose={() => {
+          setShowPasswordModal(false);
+          setSudoPassword("");
+          setModalError(null);
+        }}
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowPasswordModal(false);
+                setSudoPassword("");
+                setModalError(null);
+              }}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleConfirmPassword} loading={loading}>
+              Confirm
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <GlassAlert variant="warning" hideIcon message="Required for SSL certificate and server startup" />
+          <Input
+            type="password"
+            placeholder="Enter sudo password"
+            value={sudoPassword}
+            onChange={(e) => setSudoPassword(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !loading) handleConfirmPassword(); }}
+          />
+          {modalError && <GlassAlert variant="error" hideIcon message={modalError} />}
         </div>
-      )}
+      </Modal>
 
-      {/* Port 443 Conflict Modal */}
-      {port443Conflict && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="mx-4 flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-xl sm:p-6">
-            <h3 className="font-semibold text-text-main">Port 443 Already In Use</h3>
-            <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <span className="material-symbols-outlined text-yellow-500 text-[20px]">warning</span>
-              <div className="flex flex-col gap-1 text-xs text-text-muted">
-                <p>Port 443 is currently used by another process:</p>
-                <p className="font-mono text-text-main" data-i18n-skip="true">
-                  {port443Conflict.owner.name} (PID {port443Conflict.owner.pid})
-                </p>
-                <p>Kill this process to start MITM Server?</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => { setPort443Conflict(null); setLoading(false); }} disabled={loading}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleKillAndStart} loading={loading}>
-                Kill & Start
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={!!port443Conflict}
+        title="Port 443 Already In Use"
+        onClose={() => {
+          setPort443Conflict(null);
+          setLoading(false);
+        }}
+        size="md"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPort443Conflict(null);
+                setLoading(false);
+              }}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleKillAndStart} loading={loading}>
+              Kill & Start
+            </Button>
+          </>
+        }
+      >
+        {port443Conflict && (
+          <GlassAlert
+            variant="warning"
+            hideIcon
+            message={`Port 443 is used by ${port443Conflict.owner.name} (PID ${port443Conflict.owner.pid}). Kill this process to start MITM Server?`}
+          />
+        )}
+      </Modal>
     </>
   );
 }

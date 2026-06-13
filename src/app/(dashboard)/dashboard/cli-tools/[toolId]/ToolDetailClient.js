@@ -147,7 +147,7 @@ export default function ToolDetailClient({ toolId, machineId }) {
   // Guard removed/unknown tools (e.g. disabled Cowork) to avoid crash on direct URL.
   if (!tool) {
     return (
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-1 sm:px-0">
+      <div className="flex w-full min-w-0 flex-col gap-4 px-1 sm:px-0">
         <Link href="/dashboard/cli-tools" className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-primary w-fit">
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
           Back to CLI Tools
@@ -158,15 +158,11 @@ export default function ToolDetailClient({ toolId, machineId }) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-1 sm:px-0">
+    <div className="flex w-full min-w-0 flex-col gap-4 px-1 sm:px-0">
       <Link href="/dashboard/cli-tools" className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-primary w-fit">
         <span className="material-symbols-outlined text-[18px]">arrow_back</span>
         Back to CLI Tools
       </Link>
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-text-main sm:text-2xl">{tool.name}</h1>
-        <p className="text-sm text-text-muted">{tool.description}</p>
-      </div>
       {loading ? <CardSkeleton /> : renderToolCard()}
     </div>
   );

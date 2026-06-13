@@ -225,10 +225,65 @@ export async function verifyOidcIdToken({
   return payload;
 }
 
-export function pickOidcDisplayName(payload = {}) {
-  return payload.preferred_username || payload.email || payload.name || payload.given_name || payload.sub || "OIDC user";
+export function looksLikeOpaqueId(value) {
+  const s = String(value || "").trim();
+  if (!s) return true;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return true;
+  if (/^[0-9a-f]{16,}$/i.test(s)) return true;
+  if (/^\d{6,}$/.test(s)) return true;
+  return false;
 }
 
 export function pickOidcEmail(payload = {}) {
-  return payload.email || "";
+  const candidates = [
+    payload.email,
+    payload.upn,
+    typeof payload.preferred_username === "string" && payload.preferred_username.includes("@")
+      ? payload.preferred_username
+      : "",
+  ];
+  for (const value of candidates) {
+    const email = String(value || "").trim();
+    if (email.includes("@")) return email;
+  }
+  return "";
+}
+
+export function pickOidcDisplayName(payload = {}) {
+  const fullName = [payload.given_name, payload.family_name]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  const candidates = [
+    payload.name,
+    fullName,
+    payload.nickname,
+    payload.preferred_username,
+    payload.username,
+    payload.upn,
+  ]
+    .map((v) => String(v || "").trim())
+    .filter((v) => v && !looksLikeOpaqueId(v));
+
+  if (candidates.length > 0) return candidates[0];
+
+  const email = pickOidcEmail(payload);
+  if (email) {
+    const local = email.split("@")[0];
+    if (local && !looksLikeOpaqueId(local)) return local;
+    return email;
+  }
+
+  return null;
+}
+
+export async function fetchOidcUserInfo(userinfoEndpoint, accessToken) {
+  if (!userinfoEndpoint || !accessToken) return null;
+  const res = await fetch(userinfoEndpoint, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
 }

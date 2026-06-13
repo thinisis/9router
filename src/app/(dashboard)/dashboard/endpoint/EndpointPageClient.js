@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
-import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal } from "@/shared/components";
+import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal, GlassAlert, SegmentedControl, EmptyState } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { getCurrentLocale, onLocaleChange } from "@/i18n/runtime";
+import { DEFAULT_LOCALE } from "@/i18n/config";
 
 // Locales that unlock wenyan (classical Chinese) caveman levels
 const WENYAN_LOCALES = ["zh-CN", "zh-TW"];
@@ -62,6 +63,7 @@ const CAVEMAN_LEVELS = [
   { id: "wenyan-ultra", label: "文 Ultra", desc: "Extreme classical compression", wenyan: true },
 ];
 export default function APIPageClient({ machineId }) {
+  const [endpointTab, setEndpointTab] = useState("endpoint");
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -76,7 +78,7 @@ export default function APIPageClient({ machineId }) {
   const [rtkEnabled, setRtkEnabledState] = useState(true);
   const [cavemanEnabled, setCavemanEnabled] = useState(false);
   const [cavemanLevel, setCavemanLevel] = useState("full");
-  const [locale, setLocale] = useState("en");
+  const [locale, setLocale] = useState(DEFAULT_LOCALE);
 
   // Cloudflare Tunnel state
   const [tunnelChecking, setTunnelChecking] = useState(true);
@@ -808,8 +810,19 @@ export default function APIPageClient({ machineId }) {
   const currentEndpoint = baseUrl;
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Endpoint Card */}
+    <div className="flex w-full min-w-0 flex-col gap-6 xl:gap-8">
+      <SegmentedControl
+        options={[
+          { value: "endpoint", label: "Endpoint", icon: "api" },
+          { value: "keys", label: "API Keys", icon: "vpn_key" },
+          { value: "advanced", label: "Advanced", icon: "tune" },
+        ]}
+        value={endpointTab}
+        onChange={setEndpointTab}
+        className="w-full sm:w-auto"
+      />
+
+      {endpointTab === "endpoint" && (
       <Card>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <span className="material-symbols-outlined text-primary">api</span>
@@ -1007,10 +1020,11 @@ export default function APIPageClient({ machineId }) {
         {/* Pre-enable security gate banner */}
         {isLoginUnsafe && !tunnelEnabled && !tsEnabled && (
           <div className="mt-4">
-            <SecurityWarning
-              message={unsafeReason}
-              action={{ label: "Open settings", href: "/dashboard/profile" }}
-            />
+            <GlassAlert
+                hideIcon
+                message={unsafeReason}
+                action={{ label: "Open settings", href: "/dashboard/profile" }}
+              />
           </div>
         )}
 
@@ -1018,13 +1032,15 @@ export default function APIPageClient({ machineId }) {
         {(tunnelEnabled || tsEnabled) && (
           <div className="mt-4 flex flex-col gap-2">
             {!requireApiKey && (
-              <SecurityWarning
+              <GlassAlert
+                hideIcon
                 message="Require API key is disabled — your endpoint is publicly accessible without authentication."
-                action={{ label: "Enable", href: "#require-api-key" }}
+                action={{ label: "Enable", onClick: () => setEndpointTab("keys") }}
               />
             )}
             {(!requireLogin || !hasPassword) && (
-              <SecurityWarning
+              <GlassAlert
+                hideIcon
                 message={
                   !requireLogin
                     ? "Require login is disabled — anyone can access your dashboard via tunnel."
@@ -1053,8 +1069,9 @@ export default function APIPageClient({ machineId }) {
           </div>
         )}
       </Card>
+      )}
 
-      {/* Token Saver (RTK + Caveman) */}
+      {endpointTab === "advanced" && (
       <Card id="rtk">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -1132,8 +1149,9 @@ export default function APIPageClient({ machineId }) {
           </div>
         </div>
       </Card>
+      )}
 
-      {/* API Keys */}
+      {endpointTab === "keys" && (
       <Card id="require-api-key">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -1160,21 +1178,17 @@ export default function APIPageClient({ machineId }) {
 
         {isRemoteHost && !requireApiKey && (
           <div className="mb-4 -mt-2">
-            <SecurityWarning message="Endpoint is exposed without an API key." />
+            <GlassAlert hideIcon message="Endpoint is exposed without an API key." />
           </div>
         )}
 
         {keys.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary mb-4">
-              <span className="material-symbols-outlined text-[32px]">vpn_key</span>
-            </div>
-            <p className="text-text-main font-medium mb-1">No API keys yet</p>
-            <p className="text-sm text-text-muted mb-4">Create your first API key to get started</p>
-            <Button icon="add" onClick={() => setShowAddModal(true)}>
-              Create Key
-            </Button>
-          </div>
+          <EmptyState
+            icon="vpn_key"
+            title="No API keys yet"
+            description="Create your first API key to get started"
+            action={{ label: "Create Key", icon: "add", onClick: () => setShowAddModal(true) }}
+          />
         ) : (
           <div className="flex flex-col">
             {keys.map((key) => (
@@ -1245,6 +1259,7 @@ export default function APIPageClient({ machineId }) {
           </div>
         )}
       </Card>
+      )}
 
       {/* Add Key Modal */}
       <Modal
@@ -1528,27 +1543,7 @@ function Tooltip({ text }) {
   );
 }
 
-/** Security warning banner with optional action link */
-function SecurityWarning({ message, action }) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
-      <span className="material-symbols-outlined text-[16px] shrink-0 mt-0.5">warning</span>
-      <p className="text-xs flex-1">{message}</p>
-      {action && (
-        <a
-          href={action.href}
-          className="text-xs font-medium underline shrink-0 hover:opacity-80"
-          onClick={action.href.startsWith("#") ? (e) => {
-            e.preventDefault();
-            document.getElementById(action.href.slice(1))?.scrollIntoView({ behavior: "smooth" });
-          } : undefined}
-        >
-          {action.label}
-        </a>
-      )}
-    </div>
-  );
-}
+
 
 APIPageClient.propTypes = {
   machineId: PropTypes.string.isRequired,

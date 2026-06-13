@@ -3,7 +3,8 @@
 import { useParams, notFound, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Card, Badge, Button, AddCustomEmbeddingModal, NoAuthProxyCard, ProviderInfoCard } from "@/shared/components";
+import { Card, Badge, Button, Input, Modal, AddCustomEmbeddingModal, NoAuthProxyCard, ProviderInfoCard } from "@/shared/components";
+import { cn } from "@/shared/utils/cn";
 import ProviderIcon from "@/shared/components/ProviderIcon";
 import { MEDIA_PROVIDER_KINDS, AI_PROVIDERS, getProviderAlias, isCustomEmbeddingProvider, resolveProviderId } from "@/shared/constants/providers";
 import { getModelsByProviderId } from "@/shared/constants/models";
@@ -846,70 +847,49 @@ function TtsExampleCard({ providerId }) {
         </div>
       </Card>
 
-      {/* Country Picker Modal */}
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
-          style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }}
-          onClick={() => setModalOpen(false)}
-        >
-          <div
-            className="border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[80vh]"
-            style={{ backgroundColor: "var(--color-bg)", isolation: "isolate" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0 rounded-t-xl">
-              <h3 className="text-sm font-semibold">Select Language</h3>
-              <button onClick={() => setModalOpen(false)} className="text-text-muted hover:text-primary transition-colors">
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="px-4 py-2.5 border-b border-border shrink-0">
-              <input
-                autoFocus
-                value={modalSearch}
-                onChange={(e) => setModalSearch(e.target.value)}
-                placeholder="Search language..."
-                className="w-full px-3 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:border-primary"
-              />
-            </div>
-
-            {/* Language list */}
-            <div className="overflow-y-auto flex-1 p-2">
-              {modalError && <p className="text-xs text-red-500 px-2 py-1">{modalError}</p>}
-              {modalLoading ? (
-                <p className="text-xs text-text-muted px-2 py-3">Loading...</p>
-              ) : (
-                <div className="flex flex-col gap-0.5">
-                  {filteredLanguages.map((c) => (
-                    <button
-                      key={c.code}
-                      onClick={() => handlePickLanguage(c)}
-                      className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-left hover:bg-sidebar transition-colors ${
-                        selectedLang === c.code ? "bg-primary/10 text-primary" : ""
-                      }`}
-                    >
-                      <span className="text-sm">{c.name}</span>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs text-text-muted">{c.voices.length} voices</span>
-                        {selectedLang === c.code && (
-                          <span className="material-symbols-outlined text-[16px] text-primary">check</span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                  {filteredLanguages.length === 0 && (
-                    <p className="text-xs text-text-muted px-2 py-3">No languages found.</p>
-                  )}
-                </div>
-              )}
-            </div>
+      <Modal
+        isOpen={modalOpen}
+        title="Select Language"
+        onClose={() => setModalOpen(false)}
+        size="md"
+        className="!max-w-md"
+      >
+        <div className="flex flex-col gap-3 -mt-1">
+          <Input
+            icon="search"
+            value={modalSearch}
+            onChange={(e) => setModalSearch(e.target.value)}
+            placeholder="Search language..."
+            autoFocus
+          />
+          {modalError && <p className="text-xs text-danger px-1">{modalError}</p>}
+          <div className="max-h-[min(50vh,320px)] overflow-y-auto custom-scrollbar flex flex-col gap-0.5 -mx-1">
+            {modalLoading ? (
+              <p className="text-xs text-default-500 px-2 py-3">Loading...</p>
+            ) : filteredLanguages.length === 0 ? (
+              <p className="text-xs text-default-500 px-2 py-3">No languages found.</p>
+            ) : (
+              filteredLanguages.map((c) => (
+                <Button
+                  key={c.code}
+                  variant={selectedLang === c.code ? "secondary" : "ghost"}
+                  fullWidth
+                  className={cn("justify-between h-auto py-2.5", selectedLang === c.code && "bg-primary/10")}
+                  onClick={() => handlePickLanguage(c)}
+                >
+                  <span className="text-sm">{c.name}</span>
+                  <span className="flex items-center gap-2 shrink-0 text-xs text-default-500">
+                    {c.voices.length} voices
+                    {selectedLang === c.code && (
+                      <span className="material-symbols-outlined text-[16px] text-primary">check</span>
+                    )}
+                  </span>
+                </Button>
+              ))
+            )}
           </div>
         </div>
-      )}
+      </Modal>
     </>
   );
 }
@@ -1787,7 +1767,6 @@ export default function MediaProviderDetailPage() {
           </div>
           <div className="flex-1">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h1 className="text-3xl font-semibold tracking-tight">{provider.name}</h1>
               {!isCustom && provider.notice?.apiKeyUrl && (
                 <a
                   href={provider.notice.apiKeyUrl}

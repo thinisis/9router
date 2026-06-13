@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, Button, ManualConfigModal, ComboFormModal, McpMarketplaceModal, ModelSelectModal } from "@/shared/components";
+import { Card, Button, Input, Modal, ManualConfigModal, ComboFormModal, McpMarketplaceModal, ModelSelectModal, ToolSetupAlert } from "@/shared/components";
 import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
@@ -274,21 +274,15 @@ export default function CoworkToolCard({
           )}
 
           {!checking && status && !status.installed && (
-            <div className="flex flex-col gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <div className="flex items-start gap-3">
-                <span className="material-symbols-outlined text-yellow-500">warning</span>
-                <div className="flex-1">
-                  <p className="font-medium text-yellow-600 dark:text-yellow-400">Claude Desktop (Cowork mode) not detected</p>
-                  <p className="text-sm text-text-muted">Open Claude Desktop → Help → Troubleshooting → Enable Developer mode → Configure third-party inference, then return here.</p>
-                </div>
-              </div>
-              <div className="pl-9">
-                <Button variant="secondary" size="sm" onClick={() => setShowManualConfigModal(true)} className="!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30">
-                  <span className="material-symbols-outlined text-[18px] mr-1">content_copy</span>
-                  Manual Config
-                </Button>
-              </div>
-            </div>
+            <ToolSetupAlert
+              title="Claude Desktop (Cowork mode) not detected"
+              description="Open Claude Desktop → Help → Troubleshooting → Enable Developer mode → Configure third-party inference, then return here."
+            >
+              <Button variant="secondary" size="sm" onClick={() => setShowManualConfigModal(true)}>
+                <span className="material-symbols-outlined text-[18px] mr-1">content_copy</span>
+                Manual Config
+              </Button>
+            </ToolSetupAlert>
           )}
 
           {!checking && status?.installed && (
@@ -477,7 +471,7 @@ export default function CoworkToolCard({
                         })}
                       </div>
                       <p className="text-[10px] text-text-muted leading-snug">
-                        ⚠️ Local plugins run as subprocess via <code className="px-1 py-0.5 rounded bg-black/5 dark:bg-white/5">npx</code>. Requires Node.js installed.
+                        Local plugins run as subprocess via <code className="px-1 py-0.5 rounded bg-black/5 dark:bg-white/5">npx</code>. Requires Node.js installed.
                       </p>
                     </div>
                   </div>
@@ -543,55 +537,53 @@ export default function CoworkToolCard({
         addedNames={plugins.map((p) => p.name)}
       />
 
-      {/* Add Custom MCP modal */}
-      {addMcpOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setAddMcpOpen(false)}>
-          <div className="bg-surface border border-border rounded-xl shadow-xl w-full max-w-sm mx-4 p-5 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Add Custom MCP</h3>
-              <button onClick={() => setAddMcpOpen(false)} className="text-text-muted hover:text-text-main">
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-text-muted font-medium">Name</label>
-                <input
-                  type="text"
-                  placeholder="my-mcp"
-                  value={addMcpForm.name}
-                  onChange={(e) => setAddMcpForm((f) => ({ ...f, name: e.target.value.replace(/\s+/g, "-").toLowerCase() }))}
-                  className="px-2 py-1.5 rounded border border-border bg-surface text-xs outline-none focus:border-primary"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-text-muted font-medium">SSE URL</label>
-                <input
-                  type="text"
-                  placeholder="https://your-mcp-server.com/sse"
-                  value={addMcpForm.url}
-                  onChange={(e) => setAddMcpForm((f) => ({ ...f, url: e.target.value }))}
-                  className="px-2 py-1.5 rounded border border-border bg-surface text-xs outline-none focus:border-primary"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setAddMcpOpen(false)} className="px-3 py-1.5 rounded border border-border text-xs text-text-muted hover:bg-surface cursor-pointer">Cancel</button>
-              <button
-                onClick={() => {
-                  const name = addMcpForm.name.trim();
-                  if (!name || !addMcpForm.url.trim()) return;
-                  setCustomPlugins((prev) => [...prev.filter((x) => x.name !== name), { name, url: addMcpForm.url.trim(), transport: "sse", custom: true }]);
-                  setAddMcpOpen(false);
-                }}
-                className="px-3 py-1.5 rounded bg-primary text-white text-xs font-medium hover:opacity-90 cursor-pointer"
-              >Add</button>
-            </div>
-          </div>
+      <Modal
+        isOpen={addMcpOpen}
+        title="Add Custom MCP"
+        onClose={() => setAddMcpOpen(false)}
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setAddMcpOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                const name = addMcpForm.name.trim();
+                if (!name || !addMcpForm.url.trim()) return;
+                setCustomPlugins((prev) => [
+                  ...prev.filter((x) => x.name !== name),
+                  { name, url: addMcpForm.url.trim(), transport: "sse", custom: true },
+                ]);
+                setAddMcpOpen(false);
+              }}
+            >
+              Add
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <Input
+            label="Name"
+            placeholder="my-mcp"
+            value={addMcpForm.name}
+            onChange={(e) =>
+              setAddMcpForm((f) => ({
+                ...f,
+                name: e.target.value.replace(/\s+/g, "-").toLowerCase(),
+              }))
+            }
+          />
+          <Input
+            label="SSE URL"
+            placeholder="https://your-mcp-server.com/sse"
+            value={addMcpForm.url}
+            onChange={(e) => setAddMcpForm((f) => ({ ...f, url: e.target.value }))}
+          />
         </div>
-      )}
+      </Modal>
     </Card>
   );
 }

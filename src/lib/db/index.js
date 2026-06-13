@@ -67,8 +67,24 @@ export {
   saveRequestDetail, getRequestDetails, getRequestDetailById,
 } from "./repos/requestDetailsRepo.js";
 
-// Export/import full DB
-export async function exportDb() {
+import {
+  ALL_BACKUP_SECTION_IDS,
+  createBackupMeta,
+  filterBackupPayload,
+  normalizeBackupSections,
+  stripBackupMeta,
+} from "./backupSections.js";
+import { importBackupPayload } from "./backupImport.js";
+
+export {
+  BACKUP_SECTIONS,
+  ALL_BACKUP_SECTION_IDS,
+  detectBackupSections,
+  summarizeBackupPayload,
+  normalizeBackupSections,
+} from "./backupSections.js";
+
+async function buildFullBackup() {
   const db = await getAdapter();
   const { exportSettings } = await import("./repos/settingsRepo.js");
 
@@ -93,76 +109,32 @@ export async function exportDb() {
   return out;
 }
 
-export async function importDb(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+// Export/import full DB
+export async function exportDb(options = {}) {
+  const sections = normalizeBackupSections(options.sections);
+  const full = await buildFullBackup();
+  const filtered = filterBackupPayload(full, sections);
+
+  return {
+    ...filtered,
+    _meta: createBackupMeta(sections),
+  };
+}
+
+export async function importDb(payload, options = {}) {
+  const data = stripBackupMeta(payload);
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("Invalid database payload");
   }
+
+  const sections = normalizeBackupSections(options.sections);
+  const merge = options.merge !== false;
+  const excludeDashboardSettings = options.excludeDashboardSettings === true;
+
   const db = await getAdapter();
+  importBackupPayload(db, data, { sections, merge, excludeDashboardSettings });
 
-  db.transaction(() => {
-    // Wipe all tables (keep _meta)
-    db.run(`DELETE FROM settings`);
-    db.run(`DELETE FROM providerConnections`);
-    db.run(`DELETE FROM providerNodes`);
-    db.run(`DELETE FROM proxyPools`);
-    db.run(`DELETE FROM apiKeys`);
-    db.run(`DELETE FROM combos`);
-    db.run(`DELETE FROM kv WHERE scope IN ('modelAliases', 'customModels', 'mitmAlias', 'pricing')`);
-
-    // Settings
-    if (payload.settings) {
-      db.run(`INSERT INTO settings(id, data) VALUES(1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data`, [stringifyJson(payload.settings)]);
-    }
-
-    for (const c of payload.providerConnections || []) {
-      const { id, provider, authType, name, email, priority, isActive, createdAt, updatedAt, ...rest } = c;
-      db.run(
-        `INSERT OR REPLACE INTO providerConnections(id, provider, authType, name, email, priority, isActive, data, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, provider, authType || "oauth", name || null, email || null, priority || null, isActive === false ? 0 : 1, stringifyJson(rest), createdAt || new Date().toISOString(), updatedAt || new Date().toISOString()]
-      );
-    }
-    for (const n of payload.providerNodes || []) {
-      const { id, type, name, createdAt, updatedAt, ...rest } = n;
-      db.run(
-        `INSERT OR REPLACE INTO providerNodes(id, type, name, data, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?, ?)`,
-        [id, type || null, name || null, stringifyJson(rest), createdAt || new Date().toISOString(), updatedAt || new Date().toISOString()]
-      );
-    }
-    for (const p of payload.proxyPools || []) {
-      const { id, isActive, testStatus, createdAt, updatedAt, ...rest } = p;
-      db.run(
-        `INSERT OR REPLACE INTO proxyPools(id, isActive, testStatus, data, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?, ?)`,
-        [id, isActive === false ? 0 : 1, testStatus || "unknown", stringifyJson(rest), createdAt || new Date().toISOString(), updatedAt || new Date().toISOString()]
-      );
-    }
-    for (const k of payload.apiKeys || []) {
-      db.run(
-        `INSERT OR REPLACE INTO apiKeys(id, key, name, machineId, isActive, createdAt) VALUES(?, ?, ?, ?, ?, ?)`,
-        [k.id, k.key, k.name || null, k.machineId || null, k.isActive === false ? 0 : 1, k.createdAt || new Date().toISOString()]
-      );
-    }
-    for (const c of payload.combos || []) {
-      db.run(
-        `INSERT OR REPLACE INTO combos(id, name, kind, models, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?, ?)`,
-        [c.id, c.name, c.kind || null, stringifyJson(c.models || []), c.createdAt || new Date().toISOString(), c.updatedAt || new Date().toISOString()]
-      );
-    }
-    for (const [a, m] of Object.entries(payload.modelAliases || {})) {
-      db.run(`INSERT OR REPLACE INTO kv(scope, key, value) VALUES('modelAliases', ?, ?)`, [a, stringifyJson(m)]);
-    }
-    for (const m of payload.customModels || []) {
-      const k = `${m.providerAlias}|${m.id}|${m.type || "llm"}`;
-      db.run(`INSERT OR REPLACE INTO kv(scope, key, value) VALUES('customModels', ?, ?)`, [k, stringifyJson(m)]);
-    }
-    for (const [tool, mappings] of Object.entries(payload.mitmAlias || {})) {
-      db.run(`INSERT OR REPLACE INTO kv(scope, key, value) VALUES('mitmAlias', ?, ?)`, [tool, stringifyJson(mappings || {})]);
-    }
-    for (const [provider, models] of Object.entries(payload.pricing || {})) {
-      db.run(`INSERT OR REPLACE INTO kv(scope, key, value) VALUES('pricing', ?, ?)`, [provider, stringifyJson(models || {})]);
-    }
-  });
-
-  return await exportDb();
+  return await exportDb({ sections: ALL_BACKUP_SECTION_IDS });
 }
 
 // Eager init helper (optional)

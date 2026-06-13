@@ -51,14 +51,14 @@ export function getStatusColor(percentage) {
 }
 
 /**
- * Get status emoji based on percentage
+ * Get status level based on remaining percentage
  * @param {number} percentage - Remaining percentage (0-100)
- * @returns {string} Emoji: "🟢" | "🟡" | "🔴"
+ * @returns {"high" | "medium" | "low"}
  */
-export function getStatusEmoji(percentage) {
-  if (percentage > 70) return "🟢";
-  if (percentage >= 30) return "🟡";
-  return "🔴"; // 0-29% including 0% (out of quota) - show red
+export function getStatusLevel(percentage) {
+  if (percentage > 70) return "high";
+  if (percentage >= 30) return "medium";
+  return "low";
 }
 
 /**

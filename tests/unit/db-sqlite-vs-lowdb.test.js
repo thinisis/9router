@@ -233,6 +233,7 @@ describe("DB SQLite layer — public API parity", () => {
   it("exportDb / importDb roundtrip", async () => {
     const exported = await sqliteDb.exportDb();
     expect(exported.settings).toBeDefined();
+    expect(exported._meta?.sections).toBeDefined();
     expect(Array.isArray(exported.providerConnections)).toBe(true);
     expect(typeof exported.modelAliases).toBe("object");
 
@@ -243,8 +244,32 @@ describe("DB SQLite layer — public API parity", () => {
     await sqliteDb.setModelAlias("marker", "after");
     expect((await sqliteDb.getModelAliases()).marker).toBe("after");
 
-    await sqliteDb.importDb(snap);
+    await sqliteDb.importDb(snap, { merge: false });
     expect((await sqliteDb.getModelAliases()).marker).toBe("before");
+  });
+
+  it("exportDb supports selective sections", async () => {
+    await sqliteDb.setModelAlias("only-alias", "gpt-test");
+    const exported = await sqliteDb.exportDb({ sections: ["modelAliases"] });
+    expect(exported.modelAliases["only-alias"]).toBe("gpt-test");
+    expect(exported.settings).toBeUndefined();
+    expect(exported._meta.sections).toEqual(["modelAliases"]);
+  });
+
+  it("importDb merge keeps unselected data", async () => {
+    await sqliteDb.setModelAlias("keep-me", "stay");
+    const snap = await sqliteDb.exportDb({ sections: ["modelAliases"] });
+    await sqliteDb.setModelAlias("keep-me", "gone");
+    await sqliteDb.setModelAlias("from-backup", "restore");
+
+    const backupOnly = {
+      modelAliases: { "from-backup": "restored-value" },
+    };
+
+    await sqliteDb.importDb(backupOnly, { sections: ["modelAliases"], merge: true });
+    const aliases = await sqliteDb.getModelAliases();
+    expect(aliases["from-backup"]).toBe("restored-value");
+    expect(aliases["keep-me"]).toBe("gone");
   });
 
   it("pricing: user pricing merged with constants", async () => {

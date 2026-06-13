@@ -347,7 +347,10 @@ export default function ComboDetailPage() {
           {testResult && (
             <div className="mt-3 flex flex-col gap-3">
               {testResult.latencyMs != null && (
-                <span className="text-[11px] text-text-muted">⚡ {testResult.latencyMs}ms</span>
+                <span className="text-[11px] text-text-muted inline-flex items-center gap-0.5">
+                  <span className="material-symbols-outlined text-[12px]">bolt</span>
+                  {testResult.latencyMs}ms
+                </span>
               )}
               {testResult.imageUrl && (
                 <div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Badge } from "@/shared/components";
+import { Card, Badge, Button } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import {
   SKILLS,
@@ -12,16 +12,15 @@ import {
 function CopyButton({ value, label = "Copy link" }) {
   const { copied, copy } = useCopyToClipboard(2000);
   return (
-    <button
+    <Button
+      size="sm"
       onClick={() => copy(value)}
-      className="px-2 py-1 rounded-md bg-primary text-white text-[11px] font-medium hover:bg-primary/90 transition-colors cursor-pointer shrink-0 inline-flex items-center gap-1"
       title={value}
+      className="shrink-0 text-[11px] h-7 min-h-7 px-2"
+      icon={copied ? "check" : "content_copy"}
     >
-      <span className="material-symbols-outlined text-[12px]">
-        {copied ? "check" : "content_copy"}
-      </span>
       {copied ? "Copied!" : label}
-    </button>
+    </Button>
   );
 }
 
@@ -74,7 +73,7 @@ function SkillRow({ skill }) {
 
 export default function SkillsPage() {
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       <Card padding="md">
         <div className="text-xs text-text-muted mb-2">Paste this to your AI:</div>
         <div className="px-3 py-2 rounded bg-surface-2 font-mono text-[12px] text-text-main">

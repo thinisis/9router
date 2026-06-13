@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
-import { Modal, Button, Input } from "@/shared/components";
+import { Modal, Button, Input, TextArea } from "@/shared/components";
 
 /**
  * Cursor Auth Modal
@@ -152,18 +152,15 @@ export default function CursorAuthModal({ isOpen, onSuccess, onClose }) {
             )}
 
             {/* Access Token Input */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Access Token <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-                placeholder="Access token will be auto-filled..."
-                rows={3}
-                className="w-full px-3 py-2 text-sm font-mono border border-border rounded-lg bg-background focus:outline-none focus:border-primary resize-none"
-              />
-            </div>
+            <TextArea
+              label="Access Token"
+              required
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+              placeholder="Access token will be auto-filled..."
+              rows={4}
+              textareaClassName="font-mono"
+            />
 
             {/* Machine ID Input */}
             <div>

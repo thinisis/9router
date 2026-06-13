@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/shared/components/Card";
+import Button from "@/shared/components/Button";
 import PricingModal from "@/shared/components/PricingModal";
 
 export default function PricingSettingsPage() {
@@ -53,19 +54,10 @@ export default function PricingSettingsPage() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Pricing Settings</h1>
-          <p className="text-text-muted mt-1">
-            Configure pricing rates for cost tracking and calculations
-          </p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
-        >
+      <div className="flex items-center justify-end">
+        <Button onClick={() => setShowModal(true)} icon="edit">
           Edit Pricing
-        </button>
+        </Button>
       </div>
 
       {/* Quick Stats */}

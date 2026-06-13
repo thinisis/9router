@@ -5,6 +5,7 @@ import {
   fetchOidcDiscovery,
   getOidcRuntimeConfig,
   getPublicOrigin,
+  fetchOidcUserInfo,
   pickOidcDisplayName,
   pickOidcEmail,
   verifyOidcIdToken,
@@ -71,12 +72,25 @@ export async function GET(request) {
       nonce: storedNonce,
     });
 
+    let identity = { ...payload };
+    if (tokenData.access_token && discovery.userinfo_endpoint) {
+      const userinfo = await fetchOidcUserInfo(discovery.userinfo_endpoint, tokenData.access_token);
+      if (userinfo && typeof userinfo === "object") {
+        identity = { ...payload, ...userinfo };
+      }
+    }
+
     clearOidcCookies(cookieStore);
+    const oidcEmail = pickOidcEmail(identity) || null;
+    const oidcName = pickOidcDisplayName(identity);
+    const oidcUsername = String(identity.preferred_username || identity.username || "").trim() || null;
+
     await setDashboardAuthCookie(cookieStore, request, {
       oidc: true,
       oidcSub: payload.sub || null,
-      oidcEmail: pickOidcEmail(payload) || null,
-      oidcName: pickOidcDisplayName(payload),
+      oidcEmail,
+      oidcName: oidcName || oidcUsername,
+      oidcUsername,
     });
 
     return NextResponse.redirect(new URL("/dashboard", getPublicOrigin(request)));

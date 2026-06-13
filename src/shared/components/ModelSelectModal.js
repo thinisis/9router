@@ -45,69 +45,56 @@ export default function ModelSelectModal({
   const [providerNodes, setProviderNodes] = useState([]);
   const [customModels, setCustomModels] = useState([]);
   const [disabledModels, setDisabledModels] = useState({});
-
-  const fetchCombos = async () => {
-    try {
-      const res = await fetch("/api/combos");
-      if (!res.ok) throw new Error(`Failed to fetch combos: ${res.status}`);
-      const data = await res.json();
-      setCombos(data.combos || []);
-    } catch (error) {
-      console.error("Error fetching combos:", error);
-      setCombos([]);
-    }
-  };
+  const [dataLoading, setDataLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen) fetchCombos();
-  }, [isOpen]);
-
-  const fetchProviderNodes = async () => {
-    try {
-      const res = await fetch("/api/provider-nodes");
-      if (!res.ok) throw new Error(`Failed to fetch provider nodes: ${res.status}`);
-      const data = await res.json();
-      setProviderNodes(data.nodes || []);
-    } catch (error) {
-      console.error("Error fetching provider nodes:", error);
-      setProviderNodes([]);
+    if (!isOpen) {
+      setDataLoading(false);
+      return;
     }
-  };
 
-  useEffect(() => {
-    if (isOpen) fetchProviderNodes();
-  }, [isOpen]);
+    let cancelled = false;
+    setDataLoading(true);
 
-  const fetchCustomModels = async () => {
-    try {
-      const res = await fetch("/api/models/custom");
-      if (!res.ok) throw new Error(`Failed to fetch custom models: ${res.status}`);
-      const data = await res.json();
-      setCustomModels(data.models || []);
-    } catch (error) {
-      console.error("Error fetching custom models:", error);
-      setCustomModels([]);
+    async function loadModalData() {
+      try {
+        const [combosRes, nodesRes, customRes, disabledRes] = await Promise.all([
+          fetch("/api/combos"),
+          fetch("/api/provider-nodes"),
+          fetch("/api/models/custom"),
+          fetch("/api/models/disabled"),
+        ]);
+
+        if (cancelled) return;
+
+        const combosData = combosRes.ok ? await combosRes.json() : { combos: [] };
+        const nodesData = nodesRes.ok ? await nodesRes.json() : { nodes: [] };
+        const customData = customRes.ok ? await customRes.json() : { models: [] };
+        const disabledData = disabledRes.ok ? await disabledRes.json() : { disabled: {} };
+
+        if (cancelled) return;
+
+        setCombos(combosData.combos || []);
+        setProviderNodes(nodesData.nodes || []);
+        setCustomModels(customData.models || []);
+        setDisabledModels(disabledData.disabled || {});
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Error loading model selector:", error);
+          setCombos([]);
+          setProviderNodes([]);
+          setCustomModels([]);
+          setDisabledModels({});
+        }
+      } finally {
+        if (!cancelled) setDataLoading(false);
+      }
     }
-  };
 
-  useEffect(() => {
-    if (isOpen) fetchCustomModels();
-  }, [isOpen]);
-
-  const fetchDisabledModels = async () => {
-    try {
-      const res = await fetch("/api/models/disabled");
-      if (!res.ok) throw new Error(`Failed to fetch disabled models: ${res.status}`);
-      const data = await res.json();
-      setDisabledModels(data.disabled || {});
-    } catch (error) {
-      console.error("Error fetching disabled models:", error);
-      setDisabledModels({});
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen) fetchDisabledModels();
+    loadModalData();
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen]);
 
   const allProviders = useMemo(() => ({ ...OAUTH_PROVIDERS, ...FREE_PROVIDERS, ...FREE_TIER_PROVIDERS, ...APIKEY_PROVIDERS }), []);
@@ -402,6 +389,17 @@ export default function ModelSelectModal({
 
       {/* Models grouped by provider - compact */}
       <div className="max-h-[400px] overflow-y-auto space-y-3">
+        {dataLoading ? (
+          <div className="model-select-skeleton" aria-hidden="true">
+            <div className="model-select-skeleton-search" />
+            <div className="model-select-skeleton-section" />
+            <div className="model-select-skeleton-section model-select-skeleton-section--short" />
+            <div className="model-select-skeleton-chips">
+              <span /><span /><span /><span /><span /><span />
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Combos section - always first */}
         {filteredCombos.length > 0 && (
           <div>
@@ -511,6 +509,8 @@ export default function ModelSelectModal({
             </span>
             <p className="text-xs">No models found</p>
           </div>
+        )}
+        </>
         )}
       </div>
     </Modal>

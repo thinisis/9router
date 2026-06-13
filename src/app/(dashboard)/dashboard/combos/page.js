@@ -5,7 +5,9 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { restrictToVerticalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
-import { Card, Button, Modal, Input, CardSkeleton, ModelSelectModal, Toggle, ConfirmModal } from "@/shared/components";
+import { Card, Button, Modal, Input, ModelSelectModal, Toggle, ConfirmModal, EmptyState } from "@/shared/components";
+import PageContentSkeleton from "@/shared/components/PageContentSkeleton";
+import PageToolbar from "@/shared/components/PageToolbar";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "@/shared/constants/providers";
 
@@ -127,44 +129,28 @@ export default function CombosPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-6">
-        <CardSkeleton />
-        <CardSkeleton />
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-w-0 flex-col gap-6 px-1 sm:px-0">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">Combos</h1>
-          <p className="text-sm text-text-muted mt-1">
-            Create model combos with fallback support
-          </p>
-        </div>
-        <Button icon="add" onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto">
+      <PageToolbar>
+        <Button
+          icon="add"
+          onClick={() => setShowCreateModal(true)}
+          disabled={loading}
+          className="w-full sm:w-auto"
+        >
           Create Combo
         </Button>
-      </div>
+      </PageToolbar>
 
-      {/* Combos List */}
-      {combos.length === 0 ? (
-        <Card>
-          <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary mb-4">
-              <span className="material-symbols-outlined text-[32px]">layers</span>
-            </div>
-            <p className="text-text-main font-medium mb-1">No combos yet</p>
-            <p className="text-sm text-text-muted mb-4">Create model combos with fallback support</p>
-            <Button icon="add" onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto">
-              Create Combo
-            </Button>
-          </div>
-        </Card>
+      {loading ? (
+        <PageContentSkeleton rows={2} />
+      ) : combos.length === 0 ? (
+        <EmptyState
+          icon="layers"
+          title="No combos yet"
+          description="Add your first combo to chain models in priority order."
+          action={{ label: "Create Combo", icon: "add", onClick: () => setShowCreateModal(true) }}
+        />
       ) : (
         <div className="flex flex-col gap-4">
           {combos.map((combo) => (
@@ -182,24 +168,26 @@ export default function CombosPage() {
         </div>
       )}
 
-      {/* Create Modal - Use key to force remount and reset state */}
-      <ComboFormModal
-        key="create"
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSave={handleCreate}
-        activeProviders={activeProviders}
-      />
+      {showCreateModal && (
+        <ComboFormModal
+          key="create"
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSave={handleCreate}
+          activeProviders={activeProviders}
+        />
+      )}
 
-      {/* Edit Modal - Use key to force remount and reset state */}
-      <ComboFormModal
-        key={editingCombo?.id || "new"}
-        isOpen={!!editingCombo}
-        combo={editingCombo}
-        onClose={() => setEditingCombo(null)}
-        onSave={(data) => handleUpdate(editingCombo.id, data)}
-        activeProviders={activeProviders}
-      />
+      {editingCombo && (
+        <ComboFormModal
+          key={editingCombo.id}
+          isOpen
+          combo={editingCombo}
+          onClose={() => setEditingCombo(null)}
+          onSave={(data) => handleUpdate(editingCombo.id, data)}
+          activeProviders={activeProviders}
+        />
+      )}
 
       {/* Confirm Delete Modal */}
       <ConfirmModal

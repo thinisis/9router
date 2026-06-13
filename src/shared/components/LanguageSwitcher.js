@@ -1,68 +1,39 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import { LOCALES, LOCALE_COOKIE, normalizeLocale } from "@/i18n/config";
+import { useState, useEffect, useMemo } from "react";
+import { LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, normalizeLocale } from "@/i18n/config";
 import { reloadTranslations } from "@/i18n/runtime";
+import { getLocaleMeta, getLocaleDisplayName } from "@/shared/constants/locales";
+import LocaleFlag from "./LocaleFlag";
+import Modal from "./Modal";
+import Input from "./Input";
+import Button from "./Button";
+import { cn } from "@/shared/utils/cn";
 
 function getLocaleFromCookie() {
-  if (typeof document === "undefined") return "en";
+  if (typeof document === "undefined") return DEFAULT_LOCALE;
   const cookie = document.cookie
     .split(";")
     .find((c) => c.trim().startsWith(`${LOCALE_COOKIE}=`));
-  const value = cookie ? decodeURIComponent(cookie.split("=")[1]) : "en";
+  const value = cookie ? decodeURIComponent(cookie.split("=")[1]) : DEFAULT_LOCALE;
   return normalizeLocale(value);
 }
 
-// Locale display names and flags - will be translated by runtime i18n
-const getLocaleInfo = (locale) => {
-  const locales = {
-    "en": { name: "English", flag: "🇺🇸" },
-    "vi": { name: "Tiếng Việt", flag: "🇻🇳" },
-    "zh-CN": { name: "简体中文", flag: "🇨🇳" },
-    "zh-TW": { name: "繁體中文", flag: "🇹🇼" },
-    "ja": { name: "日本語", flag: "🇯🇵" },
-    "pt-BR": { name: "Português (Brasil)", flag: "🇧🇷" },
-    "pt-PT": { name: "Português (Portugal)", flag: "🇵🇹" },
-    "ko": { name: "한국어", flag: "🇰🇷" },
-    "es": { name: "Español", flag: "🇪🇸" },
-    "de": { name: "Deutsch", flag: "🇩🇪" },
-    "fr": { name: "Français", flag: "🇫🇷" },
-    "he": { name: "עברית", flag: "🇮🇱" },
-    "ar": { name: "العربية", flag: "🇸🇦" },
-    "ru": { name: "Русский", flag: "🇷🇺" },
-    "pl": { name: "Polski", flag: "🇵🇱" },
-    "cs": { name: "Čeština", flag: "🇨🇿" },
-    "nl": { name: "Nederlands", flag: "🇳🇱" },
-    "tr": { name: "Türkçe", flag: "🇹🇷" },
-    "uk": { name: "Українська", flag: "🇺🇦" },
-    "tl": { name: "Tagalog", flag: "🇵🇭" },
-    "id": { name: "Indonesia", flag: "🇮🇩" },
-    "th": { name: "ไทย", flag: "🇹🇭" },
-    "hi": { name: "हिन्दी", flag: "🇮🇳" },
-    "bn": { name: "বাংলা", flag: "🇧🇩" },
-    "ur": { name: "اردو", flag: "🇵🇰" },
-    "ro": { name: "Română", flag: "🇷🇴" },
-    "sv": { name: "Svenska", flag: "🇸🇪" },
-    "it": { name: "Italiano", flag: "🇮🇹" },
-    "el": { name: "Ελληνικά", flag: "🇬🇷" },
-    "hu": { name: "Magyar", flag: "🇭🇺" },
-    "fi": { name: "Suomi", flag: "🇫🇮" },
-    "da": { name: "Dansk", flag: "🇩🇰" },
-    "no": { name: "Norsk", flag: "🇳🇴" }
-  };
-  return locales[locale] || { name: locale, flag: "🌐" };
-};
-
-export default function LanguageSwitcher({ className = "", isOpen: controlledOpen, onClose, hideTrigger = false }) {
-  const [locale, setLocale] = useState("en");
+export default function LanguageSwitcher({
+  className = "",
+  isOpen: controlledOpen,
+  onClose,
+  hideTrigger = false,
+}) {
+  const [locale, setLocale] = useState(DEFAULT_LOCALE);
   const [isPending, setIsPending] = useState(false);
   const [internalOpen, setInternalOpen] = useState(false);
-  const modalRef = useRef(null);
+  const [query, setQuery] = useState("");
 
   const isControlled = typeof controlledOpen === "boolean";
   const isOpen = isControlled ? controlledOpen : internalOpen;
   const setIsOpen = (value) => {
+    if (!value) setQuery("");
     if (isControlled) {
       if (!value && onClose) onClose(locale);
     } else {
@@ -71,21 +42,40 @@ export default function LanguageSwitcher({ className = "", isOpen: controlledOpe
   };
 
   useEffect(() => {
-    setLocale(getLocaleFromCookie());
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/locale", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data?.locale) {
+            setLocale(data.locale);
+            await reloadTranslations(data.locale);
+            return;
+          }
+        }
+      } catch {
+        // fall back to cookie below
+      }
+      if (!cancelled) setLocale(getLocaleFromCookie());
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Close modal when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (modalRef.current && !modalRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    }
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [isOpen]);
+  const filteredLocales = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return LOCALES;
+    return LOCALES.filter((item) => {
+      const { nativeName, englishName } = getLocaleMeta(item);
+      return (
+        item.toLowerCase().includes(q) ||
+        nativeName.toLowerCase().includes(q) ||
+        englishName.toLowerCase().includes(q)
+      );
+    });
+  }, [query]);
 
   const handleSetLocale = async (nextLocale) => {
     if (nextLocale === locale || isPending) return;
@@ -93,15 +83,20 @@ export default function LanguageSwitcher({ className = "", isOpen: controlledOpe
     setIsPending(true);
     setIsOpen(false);
     try {
-      await fetch("/api/locale", {
+      const res = await fetch("/api/locale", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ locale: nextLocale }),
       });
-      
-      // Reload translations without full page reload
-      await reloadTranslations();
-      setLocale(nextLocale);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || `Failed to set locale (${res.status})`);
+      }
+      const data = await res.json().catch(() => ({}));
+      const savedLocale = data?.locale || nextLocale;
+      await reloadTranslations(savedLocale);
+      setLocale(savedLocale);
     } catch (err) {
       console.error("Failed to set locale:", err);
     } finally {
@@ -109,82 +104,93 @@ export default function LanguageSwitcher({ className = "", isOpen: controlledOpe
     }
   };
 
+  const currentMeta = getLocaleMeta(locale);
+
   return (
     <div className={className}>
-      {/* Trigger button */}
       {!hideTrigger && (
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          disabled={isPending}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-text-muted hover:text-text-main hover:bg-surface/60 transition-colors"
+        <Button
+          variant="ghost"
+          size="sm"
+          onPress={() => setIsOpen(!isOpen)}
+          isDisabled={isPending}
+          className="gap-2"
           title="Language"
           data-i18n-skip="true"
         >
-          <span className="material-symbols-outlined text-[20px]">language</span>
-          <span className="text-sm font-medium">{getLocaleInfo(locale).name}</span>
-          <span className="text-lg">{getLocaleInfo(locale).flag}</span>
-        </button>
+          <LocaleFlag locale={locale} size="sm" />
+          <span>{currentMeta.nativeName}</span>
+          <span className="material-symbols-outlined text-[18px]">expand_more</span>
+        </Button>
       )}
 
-      {/* Portal modal - renders at document.body to avoid parent layout constraints */}
-      {isOpen && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" data-i18n-skip="true">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={() => setIsOpen(false)}
+      <Modal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title="Select Language"
+        size="md"
+        className="!max-w-md"
+      >
+        <div className="flex flex-col gap-4" data-i18n-skip="true">
+          <p className="text-sm text-default-500 -mt-1">
+            Display language for the dashboard
+          </p>
+          <Input
+            icon="search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search languages..."
+            inputClassName="h-10"
           />
-
-          {/* Modal content */}
           <div
-            ref={modalRef}
-            className="relative w-full bg-surface border border-black/10 dark:border-white/10 rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-w-2xl flex flex-col max-h-[80vh]"
+            className="max-h-[min(50vh,320px)] overflow-y-auto custom-scrollbar -mx-1 flex flex-col gap-1"
+            role="listbox"
+            aria-label="Languages"
           >
-            {/* Modal header */}
-            <div className="flex items-center justify-between p-3 border-b border-black/5 dark:border-white/5">
-              <h2 className="text-lg font-semibold text-text-main">Select Language</h2>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg text-text-muted hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                aria-label="Close"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            {/* Modal body - fixed grid columns, equal sizing */}
-            <div className="p-6 overflow-y-auto flex-1">
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
-                {LOCALES.map((item) => {
-                  const active = locale === item;
-                  const info = getLocaleInfo(item);
-                  return (
-                    <button
-                      key={item}
-                      onClick={() => handleSetLocale(item)}
-                      disabled={isPending}
-                      className={`flex flex-col items-center justify-start gap-1 px-2 py-3 rounded-lg text-xs font-medium transition-colors w-full ${
-                        active
-                          ? "bg-primary/15 text-primary ring-2 ring-primary"
-                          : "text-text-main hover:bg-black/5 dark:hover:bg-white/5"
-                      } ${isPending ? "opacity-70 cursor-wait" : ""}`}
-                      title={info.name}
-                    >
-                      <span className="text-2xl">{info.flag}</span>
-                      {/* Fixed 2-line height so all cards are uniform */}
-                      <span className="text-center leading-tight line-clamp-2 h-8 flex items-center">{info.name}</span>
-                      {active && (
-                        <span className="material-symbols-outlined text-sm">check</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {filteredLocales.length === 0 ? (
+              <p className="text-sm text-default-500 text-center py-6">
+                No languages match your search.
+              </p>
+            ) : (
+              filteredLocales.map((item) => {
+                const active = locale === item;
+                const meta = getLocaleMeta(item);
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => handleSetLocale(item)}
+                    disabled={isPending}
+                    className={cn(
+                      "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left transition-colors",
+                      active
+                        ? "bg-primary/10 text-foreground"
+                        : "hover:bg-default-100 text-foreground",
+                      isPending && "opacity-60"
+                    )}
+                  >
+                    <LocaleFlag locale={item} size="lg" className="shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">{meta.nativeName}</span>
+                      <span className="block text-xs text-default-400">{meta.englishName}</span>
+                    </span>
+                    {active && (
+                      <span className="material-symbols-outlined text-primary text-[20px]">
+                        check_circle
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
           </div>
-        </div>,
-        document.body
-      )}
+        </div>
+      </Modal>
     </div>
   );
 }
+
+export { getLocaleDisplayName };

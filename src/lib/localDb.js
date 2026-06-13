@@ -18,4 +18,6 @@ export {
   getMitmAlias, setMitmAliasAll,
   getPricing, getPricingForModel, updatePricing, resetPricing, resetAllPricing,
   exportDb, importDb,
+  BACKUP_SECTIONS, ALL_BACKUP_SECTION_IDS,
+  detectBackupSections, summarizeBackupPayload, normalizeBackupSections,
 } from "@/lib/db/index.js";

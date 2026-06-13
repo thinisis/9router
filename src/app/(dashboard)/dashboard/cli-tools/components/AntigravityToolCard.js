@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, Button, Badge, Modal, Input, ModelSelectModal } from "@/shared/components";
+import { Card, Button, Badge, Modal, Input, ModelSelectModal, GlassAlert } from "@/shared/components";
 import Image from "next/image";
 
 export default function AntigravityToolCard({
@@ -423,10 +423,7 @@ export default function AntigravityToolCard({
         size="sm"
       >
         <div className="flex flex-col gap-4">
-          <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-            <span className="material-symbols-outlined text-yellow-500 text-[20px]">warning</span>
-            <p className="text-xs text-text-muted">Required for SSL certificate and DNS configuration</p>
-          </div>
+          <GlassAlert variant="warning" hideIcon message="Required for SSL certificate and DNS configuration" />
 
           <Input
             type="password"
