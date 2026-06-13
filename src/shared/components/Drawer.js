@@ -8,6 +8,7 @@ const WIDTHS = {
   md: "w-[min(100vw,500px)]",
   lg: "w-[min(100vw,600px)]",
   xl: "w-[min(100vw,800px)]",
+  "2xl": "w-[min(100vw,960px)]",
   full: "w-full",
 };
 
