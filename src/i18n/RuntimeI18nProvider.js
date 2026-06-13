@@ -19,6 +19,7 @@ function getSkeletonVariant(pathname) {
 export function RuntimeI18nProvider({ children, initialLocale }) {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
+  const [bootTick, setBootTick] = useState(0);
   const contentRef = useRef(null);
   const skeletonRef = useRef(null);
   const prevPathRef = useRef(pathname);
@@ -28,6 +29,7 @@ export function RuntimeI18nProvider({ children, initialLocale }) {
 
   useLayoutEffect(() => {
     bootstrapI18n(initialLocale);
+    setBootTick((n) => n + 1);
   }, [initialLocale]);
 
   useEffect(() => {
@@ -67,12 +69,7 @@ export function RuntimeI18nProvider({ children, initialLocale }) {
     }
 
     if (content) {
-      tl.fromTo(
-        content,
-        { autoAlpha: 0, y: 4 },
-        { autoAlpha: 1, y: 0, duration: 0.34, clearProps: "transform" },
-        0.06
-      );
+      tl.fromTo(content, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.28 }, 0.04);
     }
   }, [ready]);
 
@@ -111,6 +108,7 @@ export function RuntimeI18nProvider({ children, initialLocale }) {
         ref={contentRef}
         className={ready ? "i18n-content-visible" : "i18n-content-hidden"}
         data-i18n-content
+        data-boot-tick={bootTick}
       >
         {children}
       </div>

@@ -7,7 +7,7 @@ function DashboardShellSkeleton() {
     <div className="app-shell-skeleton" aria-busy="true" aria-label="Loading interface">
       <div className="app-shell-skeleton-bg" aria-hidden="true" />
       <div className="app-shell-skeleton-layout">
-        <aside className="app-shell-skeleton-sidebar hidden lg:flex" aria-hidden="true">
+        <aside className="app-shell-skeleton-sidebar hidden lg:flex w-72 shrink-0" aria-hidden="true">
           <div className="flex items-center gap-3 px-5 pt-6 pb-4">
             <Skeleton className="size-10 rounded-2xl skeleton-shimmer" />
             <div className="flex flex-col gap-2 flex-1">

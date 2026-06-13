@@ -32,7 +32,7 @@ export default function Toggle({
       {(label || description) && (
         <Switch.Content>
           {label && <span className="text-sm font-medium text-foreground">{label}</span>}
-          {description && <span className="text-xs text-default-500 block">{description}</span>}
+          {description && <span className="text-xs text-text-muted block">{description}</span>}
         </Switch.Content>
       )}
     </Switch>

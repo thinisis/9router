@@ -33,19 +33,16 @@ export default function TextArea({
         disabled={disabled}
         required={required}
         className={cn(
-          "w-full min-h-[6.5rem] resize-y rounded-xl border border-divider bg-default-100",
-          "px-3 py-2.5 text-sm text-foreground placeholder:text-default-400",
-          "transition-all duration-150 outline-none",
-          "focus:ring-2 focus:ring-primary/25 focus:border-primary/40",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          "custom-scrollbar",
-          error && "border-danger focus:ring-danger/25",
+          "glass-input w-full min-h-[6.5rem] resize-y px-3 py-2.5 text-sm text-foreground",
+          "placeholder:text-text-subtle transition-all duration-150 outline-none",
+          "disabled:cursor-not-allowed disabled:opacity-50 custom-scrollbar",
+          error && "glass-input--error",
           textareaClassName
         )}
         {...props}
       />
       {error && <p className="text-xs text-danger">{error}</p>}
-      {hint && !error && <p className="text-xs text-default-500">{hint}</p>}
+      {hint && !error && <p className="text-xs text-text-muted">{hint}</p>}
     </div>
   );
 }

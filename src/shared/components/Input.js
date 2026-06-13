@@ -45,7 +45,7 @@ export default function Input({
       )}
       <div className={cn("relative", fullWidth && "w-full")}>
         {icon && (
-          <div className="absolute inset-y-0 left-0 z-10 flex items-center pl-3 pointer-events-none text-default-400">
+          <div className="absolute inset-y-0 left-0 z-10 flex items-center pl-3 pointer-events-none text-text-subtle">
             <span className="material-symbols-outlined text-[20px]">{icon}</span>
           </div>
         )}
@@ -58,8 +58,10 @@ export default function Input({
           autoComplete={autoComplete}
           fullWidth={fullWidth}
           className={cn(
+            "glass-input",
             SIZE_CLASSES[size] || SIZE_CLASSES.md,
             icon && "pl-10",
+            error && "glass-input--error",
             inputClassName
           )}
           {...props}

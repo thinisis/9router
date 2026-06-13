@@ -110,6 +110,9 @@ export function onI18nReady(callback) {
 
 export function translate(text) {
   if (!text || typeof text !== "string") return text;
+  if (!bootstrapped && typeof window !== "undefined") {
+    bootstrapI18n(getBootstrapLocale());
+  }
   const trimmed = text.trim();
   if (!trimmed) return text;
   if (currentLocale === "en") return text;
@@ -310,4 +313,13 @@ export async function reloadTranslations(forcedLocale) {
   await setCurrentLocale(locale, { persistCookie: false });
   ensureDomObserver();
   markI18nReady();
+}
+
+/* Sync bootstrap before first React render when inline literals are injected in layout */
+if (typeof window !== "undefined") {
+  const injectedLocale = window.__9ROUTER_LOCALE__;
+  const injectedLiterals = window.__9ROUTER_TRANSLATIONS__;
+  if ((injectedLocale || injectedLiterals) && !bootstrapped) {
+    bootstrapI18n(injectedLocale || undefined);
+  }
 }

@@ -1,0 +1,69 @@
+/* Glass utility classes */
+
+.glass-raised {
+  background: var(--lg-glass-raised);
+  backdrop-filter: blur(var(--lg-blur-lg)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-lg)) saturate(var(--lg-saturate));
+  border: 1px solid var(--lg-stroke-outer);
+  box-shadow: var(--lg-shadow-raised);
+  border-radius: var(--lg-radius-lg);
+  isolation: isolate;
+}
+
+.glass-flat {
+  background: var(--lg-glass-flat);
+  backdrop-filter: blur(var(--lg-blur-md)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-md)) saturate(var(--lg-saturate));
+  border: 1px solid var(--lg-stroke-muted);
+  border-radius: var(--lg-radius-md);
+}
+
+.glass-recessed {
+  background: var(--lg-glass-recessed);
+  border: 1px solid var(--lg-stroke-muted);
+  box-shadow: var(--lg-inset-shadow), inset 0 1px 0 var(--lg-stroke-inner);
+  backdrop-filter: blur(var(--lg-blur-sm)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-sm)) saturate(var(--lg-saturate));
+  border-radius: var(--lg-radius-sm);
+}
+
+.glass-float {
+  background:
+    linear-gradient(180deg, var(--lg-tint-hover) 0%, transparent 38%),
+    var(--lg-glass-float);
+  backdrop-filter: blur(var(--lg-blur-xl)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-xl)) saturate(var(--lg-saturate));
+  border: 1px solid var(--lg-stroke-outer);
+  box-shadow: var(--lg-shadow-float);
+  border-radius: var(--lg-radius-lg);
+}
+
+.glass-cap {
+  background: linear-gradient(180deg, var(--lg-tint-hover) 0%, transparent 42%);
+}
+
+.glass-panel,
+.glass-popup {
+  background: var(--lg-glass-raised);
+  backdrop-filter: blur(var(--lg-blur-lg)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-lg)) saturate(var(--lg-saturate));
+  border: 1px solid var(--lg-stroke-outer);
+  box-shadow: var(--lg-shadow-raised);
+  border-radius: var(--lg-radius-lg);
+  isolation: isolate;
+}
+
+.glass-popup {
+  background:
+    linear-gradient(180deg, var(--lg-tint-hover) 0%, transparent 38%),
+    var(--lg-glass-float);
+  box-shadow: var(--lg-shadow-float), var(--lg-shadow-elevated);
+}
+
+.glass-panel-subtle {
+  background: var(--lg-glass-flat);
+  backdrop-filter: blur(var(--lg-blur-md)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-md)) saturate(var(--lg-saturate));
+  border: 1px solid var(--lg-stroke-muted);
+  border-radius: var(--lg-radius-md);
+}

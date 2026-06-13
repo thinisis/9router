@@ -1,0 +1,99 @@
+/* Frost Blue Glass — foundation tokens */
+
+:root {
+  --lg-hue-brand: 212;
+  --lg-brand-50: #eef6ff;
+  --lg-brand-100: #d9ebff;
+  --lg-brand-200: #b8d9ff;
+  --lg-brand-300: #85beff;
+  --lg-brand-400: #4d9eff;
+  --lg-brand-500: #2b7fe8;
+  --lg-brand-600: #1a63c4;
+  --lg-brand-700: #164fa0;
+  --lg-brand-800: #174385;
+  --lg-brand-900: #183a6e;
+
+  --lg-primary: var(--lg-brand-500);
+  --lg-primary-hover: var(--lg-brand-600);
+  --lg-accent: #7eb8ff;
+
+  --lg-bg-base: #e6edf6;
+  --lg-bg-depth: #d9e4f0;
+  --lg-orb-1: rgba(43, 127, 232, 0.18);
+  --lg-orb-2: rgba(140, 180, 255, 0.12);
+  --lg-orb-3: rgba(120, 160, 255, 0.1);
+
+  --lg-text-primary: #0c1829;
+  --lg-text-secondary: #3d5670;
+  --lg-text-tertiary: #6b849c;
+
+  --lg-danger: #e5484d;
+  --lg-success: #30a46c;
+  --lg-warning: #f5a524;
+  --lg-info: var(--lg-brand-500);
+
+  --lg-radius-sm: 10px;
+  --lg-radius-md: 14px;
+  --lg-radius-lg: 20px;
+
+  /* Backward-compatible aliases */
+  --color-brand-50: var(--lg-brand-50);
+  --color-brand-100: var(--lg-brand-100);
+  --color-brand-200: var(--lg-brand-200);
+  --color-brand-300: var(--lg-brand-300);
+  --color-brand-400: var(--lg-brand-400);
+  --color-brand-500: var(--lg-brand-500);
+  --color-brand-600: var(--lg-brand-600);
+  --color-brand-700: var(--lg-brand-700);
+  --color-brand-800: var(--lg-brand-800);
+  --color-brand-900: var(--lg-brand-900);
+  --color-primary: var(--lg-primary);
+  --color-primary-hover: var(--lg-primary-hover);
+  --color-accent: var(--lg-accent);
+  --color-bg: var(--lg-bg-base);
+  --color-bg-alt: var(--lg-bg-depth);
+  --color-text: var(--lg-text-primary);
+  --color-text-main: var(--lg-text-primary);
+  --color-text-muted: var(--lg-text-secondary);
+  --color-text-subtle: var(--lg-text-tertiary);
+  --color-danger: var(--lg-danger);
+  --color-success: var(--lg-success);
+  --color-warning: var(--lg-warning);
+  --color-info: var(--lg-info);
+  --radius-brand: var(--lg-radius-md);
+  --radius-brand-lg: var(--lg-radius-lg);
+
+  color-scheme: light;
+}
+
+.dark {
+  --lg-brand-500: #5ba8ff;
+  --lg-brand-600: #3d8ef0;
+  --lg-primary: var(--lg-brand-500);
+  --lg-primary-hover: var(--lg-brand-600);
+  --lg-accent: #8ec8ff;
+
+  --lg-bg-base: #050a12;
+  --lg-bg-depth: #0a1220;
+  --lg-orb-1: rgba(43, 127, 232, 0.14);
+  --lg-orb-2: rgba(91, 168, 255, 0.1);
+  --lg-orb-3: rgba(80, 120, 220, 0.08);
+
+  --lg-text-primary: #e8eef8;
+  --lg-text-secondary: rgba(232, 238, 248, 0.72);
+  --lg-text-tertiary: rgba(232, 238, 248, 0.45);
+
+  --color-brand-500: var(--lg-brand-500);
+  --color-brand-600: var(--lg-brand-600);
+  --color-primary: var(--lg-primary);
+  --color-primary-hover: var(--lg-primary-hover);
+  --color-accent: var(--lg-accent);
+  --color-bg: var(--lg-bg-base);
+  --color-bg-alt: var(--lg-bg-depth);
+  --color-text: var(--lg-text-primary);
+  --color-text-main: var(--lg-text-primary);
+  --color-text-muted: var(--lg-text-secondary);
+  --color-text-subtle: var(--lg-text-tertiary);
+
+  color-scheme: dark;
+}

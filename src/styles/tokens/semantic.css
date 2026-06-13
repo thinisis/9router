@@ -1,0 +1,21 @@
+/* Semantic status chips on glass */
+
+:root {
+  --lg-success-bg: rgba(48, 164, 108, 0.12);
+  --lg-success-stroke: rgba(48, 164, 108, 0.28);
+  --lg-warning-bg: rgba(245, 165, 36, 0.12);
+  --lg-warning-stroke: rgba(245, 165, 36, 0.28);
+  --lg-danger-bg: rgba(229, 72, 77, 0.12);
+  --lg-danger-stroke: rgba(229, 72, 77, 0.28);
+  --lg-info-bg: var(--lg-tint-primary);
+  --lg-info-stroke: var(--lg-tint-primary-stroke);
+}
+
+.dark {
+  --lg-success-bg: rgba(48, 164, 108, 0.16);
+  --lg-success-stroke: rgba(48, 164, 108, 0.32);
+  --lg-warning-bg: rgba(245, 165, 36, 0.16);
+  --lg-warning-stroke: rgba(245, 165, 36, 0.32);
+  --lg-danger-bg: rgba(229, 72, 77, 0.16);
+  --lg-danger-stroke: rgba(229, 72, 77, 0.32);
+}

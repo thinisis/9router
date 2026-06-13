@@ -1,0 +1,73 @@
+/* Glass material tiers — raised / flat / recessed / float / modal */
+
+:root {
+  --lg-glass-raised: rgba(255, 255, 255, 0.52);
+  --lg-glass-flat: rgba(255, 255, 255, 0.36);
+  --lg-glass-nested: rgba(255, 255, 255, 0.68);
+  --lg-glass-recessed: rgba(15, 40, 80, 0.05);
+  --lg-glass-float: rgba(248, 252, 255, 0.82);
+  --lg-glass-modal: rgba(248, 252, 255, 0.86);
+  --lg-glass-sidebar: rgba(255, 255, 255, 0.4);
+
+  --lg-stroke-outer: rgba(255, 255, 255, 0.72);
+  --lg-stroke-inner: rgba(255, 255, 255, 0.9);
+  --lg-stroke-muted: rgba(80, 120, 170, 0.16);
+  --lg-stroke-focus: rgba(43, 127, 232, 0.38);
+
+  --lg-tint-primary: rgba(43, 127, 232, 0.14);
+  --lg-tint-primary-strong: rgba(43, 127, 232, 0.22);
+  --lg-tint-primary-stroke: rgba(43, 127, 232, 0.32);
+  --lg-tint-hover: rgba(255, 255, 255, 0.42);
+
+  --color-surface: var(--lg-glass-raised);
+  --color-surface-2: var(--lg-glass-flat);
+  --color-surface-3: var(--lg-glass-nested);
+  --color-surface-popup: var(--lg-glass-modal);
+  --color-sidebar: var(--lg-glass-sidebar);
+  --color-border: var(--lg-stroke-outer);
+  --color-border-subtle: var(--lg-stroke-muted);
+}
+
+.dark {
+  --lg-glass-raised: rgba(255, 255, 255, 0.09);
+  --lg-glass-flat: rgba(255, 255, 255, 0.05);
+  --lg-glass-nested: rgba(255, 255, 255, 0.12);
+  --lg-glass-recessed: rgba(0, 0, 0, 0.32);
+  --lg-glass-float: rgba(12, 20, 36, 0.78);
+  --lg-glass-modal: rgba(10, 18, 32, 0.84);
+  --lg-glass-sidebar: rgba(255, 255, 255, 0.04);
+
+  --lg-stroke-outer: rgba(255, 255, 255, 0.14);
+  --lg-stroke-inner: rgba(255, 255, 255, 0.22);
+  --lg-stroke-muted: rgba(255, 255, 255, 0.08);
+  --lg-stroke-focus: rgba(91, 168, 255, 0.42);
+
+  --lg-tint-primary: rgba(91, 168, 255, 0.18);
+  --lg-tint-primary-strong: rgba(91, 168, 255, 0.26);
+  --lg-tint-primary-stroke: rgba(91, 168, 255, 0.36);
+  --lg-tint-hover: rgba(255, 255, 255, 0.07);
+
+  --color-surface: var(--lg-glass-raised);
+  --color-surface-2: var(--lg-glass-flat);
+  --color-surface-3: var(--lg-glass-nested);
+  --color-surface-popup: var(--lg-glass-modal);
+  --color-sidebar: var(--lg-glass-sidebar);
+  --color-border: var(--lg-stroke-outer);
+  --color-border-subtle: var(--lg-stroke-muted);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  .dark {
+    --lg-glass-raised: var(--lg-bg-depth);
+    --lg-glass-flat: var(--lg-bg-base);
+    --lg-glass-nested: var(--lg-bg-depth);
+    --lg-glass-recessed: var(--lg-bg-depth);
+    --lg-glass-float: var(--lg-bg-depth);
+    --lg-glass-modal: var(--lg-bg-depth);
+    --lg-glass-sidebar: var(--lg-bg-depth);
+    --color-surface: var(--lg-bg-depth);
+    --color-surface-2: var(--lg-bg-base);
+    --color-sidebar: var(--lg-bg-depth);
+  }
+}

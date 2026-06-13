@@ -1,0 +1,54 @@
+/* Blur, shadow, highlight, elevation */
+
+:root {
+  --lg-blur-sm: 12px;
+  --lg-blur-md: 20px;
+  --lg-blur-lg: 24px;
+  --lg-blur-xl: 28px;
+  --lg-blur-modal: 32px;
+  --lg-saturate: 1.35;
+
+  --lg-highlight: var(--lg-stroke-inner);
+  --lg-inset-shadow: inset 0 2px 6px rgba(15, 40, 80, 0.06);
+  --lg-shadow-raised: 0 8px 32px rgba(15, 40, 80, 0.08), inset 0 1px 0 var(--lg-highlight);
+  --lg-shadow-float: 0 16px 48px rgba(15, 40, 80, 0.12), inset 0 1px 0 var(--lg-highlight);
+  --lg-shadow-warm: 0 12px 40px -8px rgba(43, 127, 232, 0.18);
+  --lg-shadow-elevated: 0 20px 50px -12px rgba(15, 40, 80, 0.14);
+  --lg-focus-ring: 0 0 0 3px rgba(43, 127, 232, 0.22);
+
+  --glass-blur: var(--lg-blur-lg);
+  --glass-saturate: var(--lg-saturate);
+  --glass-highlight: var(--lg-highlight);
+  --glass-shadow: var(--lg-shadow-raised);
+  --shadow-soft: var(--lg-shadow-raised);
+  --shadow-warm: var(--lg-shadow-warm);
+  --shadow-elevated: var(--lg-shadow-elevated);
+  --shadow-elev: var(--lg-shadow-raised);
+  --shadow-focus: var(--lg-focus-ring);
+}
+
+.dark {
+  --lg-inset-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
+  --lg-shadow-raised: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 var(--lg-highlight);
+  --lg-shadow-float: 0 20px 56px rgba(0, 0, 0, 0.45), inset 0 1px 0 var(--lg-highlight);
+  --lg-shadow-warm: 0 12px 40px -8px rgba(91, 168, 255, 0.22);
+  --lg-shadow-elevated: 0 24px 60px -12px rgba(0, 0, 0, 0.5);
+  --lg-focus-ring: 0 0 0 3px rgba(91, 168, 255, 0.28);
+
+  --glass-highlight: var(--lg-highlight);
+  --glass-shadow: var(--lg-shadow-raised);
+  --shadow-warm: var(--lg-shadow-warm);
+  --shadow-focus: var(--lg-focus-ring);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  .dark {
+    --lg-blur-sm: 0px;
+    --lg-blur-md: 0px;
+    --lg-blur-lg: 0px;
+    --lg-blur-xl: 0px;
+    --lg-blur-modal: 0px;
+    --glass-blur: 0px;
+  }
+}

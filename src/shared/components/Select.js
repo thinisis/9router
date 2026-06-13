@@ -30,12 +30,10 @@ export default function Select({
           onChange={onChange}
           disabled={disabled}
           className={cn(
-            "w-full min-h-10 py-2.5 px-3 pr-10 text-sm text-foreground",
-            "bg-default-100 border border-divider rounded-xl appearance-none",
-            "focus:outline-none focus:ring-2 focus:ring-primary/25",
+            "glass-input w-full min-h-10 py-2.5 px-3 pr-10 text-sm text-foreground appearance-none",
             "transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed",
             "text-[16px] sm:text-sm",
-            error && "border-danger focus:ring-danger/25",
+            error && "glass-input--error",
             selectClassName
           )}
           {...props}
@@ -49,7 +47,7 @@ export default function Select({
             </option>
           ))}
         </select>
-        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-default-400">
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-text-subtle">
           <span className="material-symbols-outlined text-[20px]">expand_more</span>
         </div>
       </div>
@@ -59,7 +57,7 @@ export default function Select({
           {error}
         </p>
       )}
-      {hint && !error && <p className="text-xs text-default-500">{hint}</p>}
+      {hint && !error && <p className="text-xs text-text-muted">{hint}</p>}
     </div>
   );
 }

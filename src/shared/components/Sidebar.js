@@ -46,7 +46,7 @@ function NavLink({ item, active, onClose }) {
       href={item.href}
       onClick={onClose}
       className={cn(
-        "dashboard-nav-link",
+        "dashboard-nav-link min-w-0",
         active && "dashboard-nav-link--active"
       )}
       data-i18n-skip="true"
@@ -59,7 +59,9 @@ function NavLink({ item, active, onClose }) {
       >
         {item.icon}
       </span>
-      <span className="text-[13px] font-medium">{translate(item.label)}</span>
+      <span className="min-w-0 flex-1 truncate text-[13px] font-medium whitespace-nowrap">
+        {translate(item.label)}
+      </span>
     </Link>
   );
 }
@@ -99,7 +101,7 @@ export default function Sidebar({ onClose }) {
   };
 
   return (
-    <aside className="dashboard-sidebar flex w-[17.5rem] shrink-0 flex-col min-h-full lg:w-72 border-r border-divider bg-background">
+    <aside className="dashboard-sidebar flex w-72 shrink-0 flex-col min-h-full border-r border-divider bg-vibrancy">
       <div className="px-5 pt-6 pb-4">
         <Link href="/dashboard" className="flex items-center gap-3 group" onClick={onClose} data-i18n-skip="true">
           <div className="flex items-center justify-center size-10 rounded-2xl bg-primary/10 text-primary">
@@ -133,7 +135,9 @@ export default function Sidebar({ onClose }) {
             onPress={() => setMediaOpen((v) => !v)}
           >
             <span className="material-symbols-outlined text-[18px] text-default-500">perm_media</span>
-            <span className="text-[13px] font-medium flex-1 text-left">{translate("Media Providers")}</span>
+            <span className="min-w-0 flex-1 truncate text-left text-[13px] font-medium whitespace-nowrap">
+              {translate("Media Providers")}
+            </span>
             <span
               className="material-symbols-outlined text-[14px] transition-transform"
               style={{ transform: mediaOpen ? "rotate(180deg)" : "rotate(0deg)" }}

@@ -1,0 +1,133 @@
+/* HeroUI + dashboard shell token bridge */
+
+.dashboard-shell {
+  --heroui-radius-medium: var(--lg-radius-sm);
+  --heroui-primary: var(--lg-primary);
+  --heroui-danger: var(--lg-danger);
+  --heroui-success: var(--lg-success);
+  --heroui-warning: var(--lg-warning);
+  --heroui-background: var(--lg-bg-base);
+  --heroui-foreground: var(--lg-text-primary);
+  --heroui-content1: var(--lg-glass-nested);
+  --heroui-content2: var(--lg-glass-flat);
+  --heroui-content3: var(--lg-glass-recessed);
+  --heroui-divider: var(--lg-stroke-muted);
+  --heroui-default-50: var(--lg-glass-flat);
+  --heroui-default-100: var(--lg-glass-recessed);
+  --heroui-default-200: var(--lg-stroke-muted);
+  --heroui-default-300: var(--lg-stroke-outer);
+  --heroui-default-400: var(--lg-text-tertiary);
+  --heroui-default-500: var(--lg-text-secondary);
+  --heroui-default-600: var(--lg-text-secondary);
+  --heroui-default-700: var(--lg-text-primary);
+}
+
+/* Recessed glass — inputs, textareas, native selects */
+.dashboard-shell [data-slot="input"],
+.dashboard-shell textarea.glass-input,
+.dashboard-shell select.glass-input,
+.glass-input {
+  background: var(--lg-glass-recessed) !important;
+  border: 1px solid var(--lg-stroke-muted) !important;
+  color: var(--lg-text-primary) !important;
+  box-shadow: var(--lg-inset-shadow), inset 0 1px 0 var(--lg-stroke-inner) !important;
+  backdrop-filter: blur(var(--lg-blur-sm)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-sm)) saturate(var(--lg-saturate));
+  border-radius: var(--lg-radius-sm) !important;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.dashboard-shell [data-slot="input"]::placeholder,
+.glass-input::placeholder {
+  color: var(--lg-text-tertiary) !important;
+}
+
+.dashboard-shell [data-slot="input"]:hover:not(:disabled):not([data-disabled="true"]),
+.glass-input:hover:not(:disabled) {
+  border-color: var(--lg-stroke-outer) !important;
+}
+
+.dashboard-shell [data-slot="input"]:focus,
+.dashboard-shell [data-slot="input"][data-focus="true"],
+.glass-input:focus {
+  outline: none !important;
+  border-color: var(--lg-stroke-focus) !important;
+  box-shadow: var(--lg-inset-shadow), var(--lg-focus-ring), inset 0 1px 0 var(--lg-stroke-inner) !important;
+}
+
+.dashboard-shell [data-slot="input"][data-invalid="true"],
+.glass-input--error {
+  border-color: var(--lg-danger-stroke) !important;
+}
+
+.dashboard-shell [data-slot="input"]:disabled,
+.dashboard-shell [data-slot="input"][data-disabled="true"],
+.glass-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* HeroUI Card surfaces */
+.dashboard-shell [data-slot="card"] {
+  background: var(--lg-glass-raised) !important;
+  border: 1px solid var(--lg-stroke-outer) !important;
+  box-shadow: var(--lg-shadow-raised) !important;
+  backdrop-filter: blur(var(--lg-blur-lg)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-lg)) saturate(var(--lg-saturate));
+}
+
+/* Popover / menu floating glass */
+.dashboard-shell [data-slot="popover"],
+.dashboard-shell [data-slot="menu"] {
+  background:
+    linear-gradient(180deg, var(--lg-tint-hover) 0%, transparent 38%),
+    var(--lg-glass-float) !important;
+  backdrop-filter: blur(var(--lg-blur-xl)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-xl)) saturate(var(--lg-saturate));
+  border: 1px solid var(--lg-stroke-outer) !important;
+  box-shadow: var(--lg-shadow-float), var(--lg-shadow-elevated) !important;
+}
+
+/* Modal / dialog */
+.dashboard-shell [data-slot="dialog"] {
+  background:
+    linear-gradient(180deg, var(--lg-tint-hover) 0%, transparent 32%),
+    var(--lg-glass-modal) !important;
+  backdrop-filter: blur(var(--lg-blur-modal)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-modal)) saturate(var(--lg-saturate));
+  border: 1px solid var(--lg-stroke-outer) !important;
+  box-shadow: var(--lg-shadow-float) !important;
+}
+
+/* Switch track = recessed, thumb = raised */
+.dashboard-shell [data-slot="switch"] [data-slot="control"] {
+  background: var(--lg-glass-recessed) !important;
+  border: 1px solid var(--lg-stroke-muted) !important;
+  box-shadow: var(--lg-inset-shadow) !important;
+}
+
+.dashboard-shell [data-slot="switch"][data-selected="true"] [data-slot="control"] {
+  background: var(--lg-tint-primary) !important;
+  border-color: var(--lg-tint-primary-stroke) !important;
+}
+
+.dashboard-shell [data-slot="switch"] [data-slot="thumb"] {
+  background: var(--lg-glass-nested) !important;
+  border: 1px solid var(--lg-stroke-outer) !important;
+  box-shadow: 0 2px 8px rgba(15, 40, 80, 0.12) !important;
+}
+
+.dark .dashboard-shell [data-slot="switch"] [data-slot="thumb"] {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Muted text utilities mapped to glass tokens */
+.text-default-400 { color: var(--lg-text-tertiary) !important; }
+.text-default-500 { color: var(--lg-text-secondary) !important; }
+.bg-default-100 { background-color: var(--lg-glass-recessed) !important; }
+.bg-default-100\/50 { background-color: color-mix(in srgb, var(--lg-glass-recessed) 50%, transparent) !important; }
+.bg-default-100\/80 { background-color: color-mix(in srgb, var(--lg-glass-recessed) 80%, transparent) !important; }
+.border-divider { border-color: var(--lg-stroke-muted) !important; }
