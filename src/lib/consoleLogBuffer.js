@@ -22,7 +22,10 @@ if (!state.emitter) {
 }
 
 function toLogLine(level, args) {
-  return args.map(formatArg).join(" ");
+  const body = args.map(formatArg).join(" ");
+  const tag = level.toUpperCase();
+  if (body.startsWith(`[${tag}]`)) return body;
+  return `[${tag}] ${body}`;
 }
 
 // Strip ANSI escape codes so terminal colors don't bleed into UI

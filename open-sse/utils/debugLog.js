@@ -8,7 +8,7 @@ function ts() {
 
 export function dbg(tag, msg) {
   if (!isDev) return;
-  console.log(`[${ts()}] 🐛 [DBG:${tag}] ${msg}`);
+  console.log(`[${ts()}] [DEBUG] [${tag}] ${msg}`);
 }
 
 export const isDebugEnabled = isDev;

@@ -149,7 +149,7 @@ async function addDNSEntry(tool, sudoPassword) {
 
   const entriesToAdd = hosts.filter(h => !checkDNSEntry(h));
   if (entriesToAdd.length === 0) {
-    log(`🌐 DNS ${tool}: already active`);
+    log(`DNS ${tool}: already active`);
     return;
   }
 
@@ -172,7 +172,7 @@ async function addDNSEntry(tool, sudoPassword) {
       await execWithPassword(`printf '%s' '${escaped}' | tee ${HOSTS_FILE} > /dev/null`, sudoPassword);
       await flushDNS(sudoPassword);
     }
-    log(`🌐 DNS ${tool}: ✅ added ${entriesToAdd.join(", ")}`);
+    log(`DNS ${tool}: added ${entriesToAdd.join(", ")}`);
   } catch (error) {
     const msg = error.message?.includes("incorrect password") ? "Wrong sudo password" : `Failed to add DNS entry: ${error.message}`;
     throw new Error(msg);
@@ -188,7 +188,7 @@ async function removeDNSEntry(tool, sudoPassword) {
 
   const entriesToRemove = hosts.filter(h => checkDNSEntry(h));
   if (entriesToRemove.length === 0) {
-    log(`🌐 DNS ${tool}: already inactive`);
+    log(`DNS ${tool}: already inactive`);
     return;
   }
 
@@ -207,7 +207,7 @@ async function removeDNSEntry(tool, sudoPassword) {
       await execWithPassword(`printf '%s' '${escaped}' | tee ${HOSTS_FILE} > /dev/null`, sudoPassword);
       await flushDNS(sudoPassword);
     }
-    log(`🌐 DNS ${tool}: ✅ removed ${entriesToRemove.join(", ")}`);
+    log(`DNS ${tool}: removed ${entriesToRemove.join(", ")}`);
   } catch (error) {
     const msg = error.message?.includes("incorrect password") ? "Wrong sudo password" : `Failed to remove DNS entry: ${error.message}`;
     throw new Error(msg);

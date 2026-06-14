@@ -431,7 +431,7 @@ async function scheduleMitmRestart(apiKey) {
       return;
     }
     await startServer(apiKey, password);
-    log("🔄 Restarted successfully");
+    log("Restarted successfully");
     mitmRestartCount = 0;
     mitmIsRestarting = false;
   } catch (e) {
@@ -471,7 +471,7 @@ async function startServer(apiKey, sudoPassword, forceKillPort443 = false) {
         const savedPid = parseInt(fs.readFileSync(PID_FILE, "utf-8").trim(), 10);
         if (savedPid && isProcessAlive(savedPid)) {
           serverPid = savedPid;
-          log(`♻️ Reusing existing process (PID: ${savedPid})`);
+          log(`Reusing existing process (PID: ${savedPid})`);
           await saveMitmSettings(true, sudoPassword);
           if (sudoPassword) setCachedPassword(sudoPassword);
           return { running: true, pid: savedPid };
@@ -517,11 +517,11 @@ async function startServer(apiKey, sudoPassword, forceKillPort443 = false) {
   if (!certExists || isCertExpired(rootCACertPath)) {
     if (certExists) {
       // Uninstall expired cert from system store before regenerating
-      log("🔐 Cert expired — uninstalling old cert...");
+      log("Certificate expired, uninstalling old certificate");
       const password = sudoPassword || getCachedPassword() || await loadEncryptedPassword();
       try { await uninstallCert(password, rootCACertPath); } catch { /* best effort */ }
     }
-    log("🔐 Generating Root CA...");
+    log("Generating Root CA");
     await generateCert();
   }
 
@@ -530,23 +530,23 @@ async function startServer(apiKey, sudoPassword, forceKillPort443 = false) {
   const rootCATrusted = await checkCertInstalled(rootCACertPath);
   const linuxNoSystemTrust = !IS_WIN && !IS_MAC && !isSudoAvailable();
   if (!rootCATrusted) {
-    log("🔐 Cert: not trusted → installing...");
+    log("Certificate not trusted, installing");
     const password = sudoPassword || getCachedPassword() || await loadEncryptedPassword();
     if (linuxNoSystemTrust) {
-      log(`🔐 Cert: skipping system trust (no sudo). Install ${rootCACertPath} as a trusted CA on machines that use this proxy.`);
+      log(`Certificate: skipping system trust (no sudo). Install ${rootCACertPath} as a trusted CA on machines that use this proxy.`);
     } else {
       if (!password && isSudoPasswordRequired()) {
         throw new Error("Sudo password required to install Root CA certificate");
       }
       try {
         await installCert(password, rootCACertPath);
-        log("🔐 Cert: ✅ trusted");
+        log("Certificate trusted");
       } catch (e) {
         throw new Error(`Failed to trust certificate: ${e.message}`);
       }
     }
   } else {
-    log("🔐 Cert: already trusted ✅");
+    log("Certificate already trusted");
   }
 
   // Step 2: Spawn server (Root CA already installed in Step 1.5)
@@ -560,7 +560,7 @@ async function startServer(apiKey, sudoPassword, forceKillPort443 = false) {
     }
   }
   const mitmRouterBase = await resolveMitmRouterBaseUrl();
-  log(`🚀 Starting server... (router: ${mitmRouterBase})`);
+  log(`Starting server (router: ${mitmRouterBase})`);
   if (IS_WIN) {
     // Check port 443 — ask user before killing
     const winOwner = await getPort443Owner(sudoPassword);
@@ -695,12 +695,12 @@ async function startServer(apiKey, sudoPassword, forceKillPort443 = false) {
 
   if (_updateSettings) await _updateSettings({ mitmCertInstalled: true }).catch(() => { });
 
-  log(`✅ Server healthy (PID: ${serverPid || health.pid})`);
+  log(`Server healthy (PID: ${serverPid || health.pid})`);
 
   // Log DNS status per tool
   const dnsStatus = checkAllDNSStatus();
   for (const [tool, active] of Object.entries(dnsStatus)) {
-    log(`🌐 DNS ${tool}: ${active ? "✅ active" : "❌ inactive"}`);
+    log(`DNS ${tool}: ${active ? "active" : "inactive"}`);
   }
 
   await saveMitmSettings(true, sudoPassword);
@@ -716,7 +716,7 @@ async function stopServer(sudoPassword) {
   // Prevent auto-restart from triggering on intentional stop
   mitmIsRestarting = true;
   mitmRestartCount = 0;
-  log("⏹ Stopping server...");
+  log("Stopping server");
 
   // Kill server process
   const proc = serverProcess;
@@ -745,7 +745,7 @@ async function stopServer(sudoPassword) {
         const next = filtered.replace(/[\r\n\s]+$/g, "") + "\r\n";
         if (next !== content) fs.writeFileSync(hostsFile, next, "utf8");
         try { require("child_process").execSync("ipconfig /flushdns", { windowsHide: true, stdio: "ignore" }); } catch { /* ignore */ }
-        log("🌐 DNS: ✅ all tool hosts removed");
+        log("DNS: all tool hosts removed");
       } else {
         const hostsList = allHosts.map(quotePs).join(",");
         const script = `
@@ -816,7 +816,7 @@ async function trustCert(sudoPassword) {
   if (!fs.existsSync(rootCACertPath)) throw new Error("Root CA not found. Start server first to generate it.");
   const { installCert } = require("./cert/install");
   if (!IS_WIN && !IS_MAC && !isSudoAvailable()) {
-    log(`🔐 Cert: system trust unavailable (no sudo). Use file: ${rootCACertPath}`);
+    log(`Certificate: system trust unavailable (no sudo). Use file: ${rootCACertPath}`);
     return;
   }
   const password = sudoPassword || getCachedPassword() || await loadEncryptedPassword();

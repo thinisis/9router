@@ -315,11 +315,11 @@ export function logUsage(provider, usage, model = null, connectionId = null, api
   const outTokens = usage?.completion_tokens || usage?.output_tokens || 0;
   const accountPrefix = connectionId ? connectionId.slice(0, 8) + "..." : "unknown";
 
-  let msg = `[${getTimeString()}] 📊 ${COLORS.green}[USAGE] ${p} | in=${inTokens} | out=${outTokens} | account=${accountPrefix}${COLORS.reset}`;
+  let msg = `[${getTimeString()}] [INFO] [USAGE] ${p} | in=${inTokens} | out=${outTokens} | account=${accountPrefix}`;
 
   // Add estimated flag if present
   if (usage.estimated) {
-    msg += ` ${COLORS.yellow}(estimated)${COLORS.reset}`;
+    msg += " (estimated)";
   }
 
   // Add cache info if present (unified from different formats)

@@ -196,7 +196,7 @@ async function negotiateAlpn(host) {
     }, () => {
       const proto = socket.alpnProtocol || "http/1.1";
       alpnCache.set(host, proto);
-      log(`🔗 [mitm] ALPN ${host} → ${proto}`);
+      log(`[mitm] ALPN ${host} → ${proto}`);
       socket.end();
       resolve(proto);
     });
@@ -411,7 +411,7 @@ try {
   process.exit(1);
 }
 
-server.listen(LOCAL_PORT, () => log(`🚀 Server ready on :${LOCAL_PORT}`));
+server.listen(LOCAL_PORT, () => log(`Server ready on :${LOCAL_PORT}`));
 
 server.on("error", (e) => {
   if (e.code === "EADDRINUSE") err(`Port ${LOCAL_PORT} already in use`);

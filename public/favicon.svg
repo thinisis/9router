@@ -1,11 +1,37 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="32" height="32" rx="6" fill="url(#gradient)"/>
-  <text x="16" y="24" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="white" text-anchor="middle">9</text>
   <defs>
-    <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#f97815"/>
-      <stop offset="1" stop-color="#c2590a"/>
+    <linearGradient id="bg" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#050a12"/>
+      <stop offset="1" stop-color="#0a1220"/>
     </linearGradient>
+    <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(24 8) rotate(90) scale(18)">
+      <stop stop-color="#2b7fe8" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#2b7fe8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="6" y1="4" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.42"/>
+      <stop offset="0.45" stop-color="#b8d9ff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#2b7fe8" stop-opacity="0.14"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="16" y1="5" x2="16" y2="27" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.88"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.18"/>
+    </linearGradient>
+    <linearGradient id="glyph" x1="16" y1="10" x2="16" y2="24" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#7eb8ff"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.2" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
+  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
+  <rect width="32" height="32" rx="7" fill="url(#orb)"/>
+  <rect x="3.5" y="3.5" width="25" height="25" rx="6.5" fill="url(#glass)" stroke="url(#edge)" stroke-width="0.75"/>
+  <rect x="4.5" y="4.5" width="23" height="10" rx="5.5" fill="#ffffff" fill-opacity="0.12"/>
+  <text x="16" y="22.5" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="17" font-weight="700" fill="url(#glyph)" text-anchor="middle" filter="url(#glow)">9</text>
 </svg>
-

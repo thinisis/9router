@@ -90,7 +90,7 @@ async function installCert(sudoPassword, certPath) {
 
   const isInstalled = await checkCertInstalled(certPath);
   if (isInstalled) {
-    log("🔐 Cert: already trusted ✅");
+    log("Certificate already trusted");
     return;
   }
 
@@ -109,7 +109,7 @@ async function installCertMac(sudoPassword, certPath) {
   const install = `security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${certPath}"`;
   try {
     await execWithPassword(`${deleteOld} && ${install}`, sudoPassword);
-    log("🔐 Cert: ✅ installed to system keychain");
+    log("Certificate installed to system keychain");
   } catch (error) {
     const msg = error.message?.includes("canceled") ? "User canceled authorization" : "Certificate install failed";
     throw new Error(msg);
@@ -126,7 +126,7 @@ async function installCertWindows(certPath) {
   `;
   try {
     await runElevatedPowerShell(script);
-    log("🔐 Cert: ✅ installed to Windows Root store");
+    log("Certificate installed to Windows Root store");
   } catch (e) {
     throw new Error(`Failed to install certificate: ${e.message}`);
   }
@@ -138,7 +138,7 @@ async function installCertWindows(certPath) {
 async function uninstallCert(sudoPassword, certPath) {
   const isInstalled = await checkCertInstalled(certPath);
   if (!isInstalled) {
-    log("🔐 Cert: not found in system store");
+    log("Certificate not found in system store");
     return;
   }
 
@@ -156,7 +156,7 @@ async function uninstallCertMac(sudoPassword, certPath) {
   const command = `security delete-certificate -Z "${fingerprint}" /Library/Keychains/System.keychain`;
   try {
     await execWithPassword(command, sudoPassword);
-    log("🔐 Cert: ✅ uninstalled from system keychain");
+    log("Certificate uninstalled from system keychain");
   } catch (err) {
     throw new Error("Failed to uninstall certificate");
   }
@@ -167,7 +167,7 @@ async function uninstallCertWindows() {
   const script = `certutil -delstore Root ${quotePs(ROOT_CA_CN)}`;
   try {
     await runElevatedPowerShell(script);
-    log("🔐 Cert: ✅ uninstalled from Windows Root store");
+    log("Certificate uninstalled from Windows Root store");
   } catch (e) {
     throw new Error(`Failed to uninstall certificate: ${e.message}`);
   }
@@ -225,7 +225,7 @@ async function updateNssDatabases(certPath, action = 'add') {
 
 async function installCertLinux(sudoPassword, certPath) {
   if (!isSudoAvailable()) {
-    log(`🔐 Cert: cannot install to system store without sudo — trust this file on clients: ${certPath}`);
+    log(`Certificate: cannot install to system store without sudo — trust this file on clients: ${certPath}`);
     // Still try to update user NSS DBs even if no sudo!
     await updateNssDatabases(certPath, 'add');
     return;
@@ -240,7 +240,7 @@ async function installCertLinux(sudoPassword, certPath) {
   try {
     await execWithPassword(cmd, sudoPassword);
     await updateNssDatabases(certPath, 'add');
-    log(`🔐 Cert: ✅ installed to Linux trust store (${config.dir}) and user browser databases`);
+    log(`Certificate installed to Linux trust store (${config.dir}) and user browser databases`);
   } catch (error) {
     throw new Error(`Certificate install failed: ${error.message}`);
   }
@@ -260,7 +260,7 @@ async function uninstallCertLinux(sudoPassword) {
   
   try {
     await execWithPassword(cmd, sudoPassword);
-    log("🔐 Cert: ✅ uninstalled from Linux trust store and user browser databases");
+    log("Certificate uninstalled from Linux trust store and user browser databases");
   } catch (error) {
     throw new Error("Failed to uninstall certificate");
   }

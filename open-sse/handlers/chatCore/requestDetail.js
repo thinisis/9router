@@ -82,7 +82,7 @@ export function saveUsageStats({ provider, model, tokens, connectionId, apiKey, 
 
   const time = new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const accountSuffix = connectionId ? ` | account=${connectionId.slice(0, 8)}...` : "";
-  console.log(`${COLORS.green}[${time}] 📊 [${label}] ${provider.toUpperCase()} | in=${inTokens} | out=${outTokens}${accountSuffix}${COLORS.reset}`);
+  console.log(`[${time}] [INFO] [${label}] ${provider.toUpperCase()} | in=${inTokens} | out=${outTokens}${accountSuffix}`);
 
   // Normalize to OpenAI token shape for storage
   const normalized = {

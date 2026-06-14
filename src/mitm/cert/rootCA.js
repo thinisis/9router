@@ -26,11 +26,11 @@ function isCertExpired(certPath) {
 async function generateRootCA() {
   const exists = fs.existsSync(ROOT_CA_KEY_PATH) && fs.existsSync(ROOT_CA_CERT_PATH);
   if (exists && !isCertExpired(ROOT_CA_CERT_PATH)) {
-    console.log("✅ Root CA already exists");
+    console.info("[INFO] [CERT] Root CA already exists");
     return { key: ROOT_CA_KEY_PATH, cert: ROOT_CA_CERT_PATH };
   }
   if (exists) {
-    console.log("🔐 Root CA expired or expiring soon — regenerating...");
+    console.info("[INFO] [CERT] Root CA expired or expiring soon, regenerating");
     try { fs.unlinkSync(ROOT_CA_KEY_PATH); } catch { /* ignore */ }
     try { fs.unlinkSync(ROOT_CA_CERT_PATH); } catch { /* ignore */ }
   }
@@ -39,7 +39,7 @@ async function generateRootCA() {
     fs.mkdirSync(MITM_DIR, { recursive: true });
   }
 
-  console.log("🔐 Generating Root CA certificate...");
+  console.info("[INFO] [CERT] Generating Root CA certificate");
 
   // Generate RSA key pair
   const keys = forge.pki.rsa.generateKeyPair(2048);
@@ -88,7 +88,7 @@ async function generateRootCA() {
   fs.writeFileSync(ROOT_CA_KEY_PATH, privateKeyPem);
   fs.writeFileSync(ROOT_CA_CERT_PATH, certPem);
 
-  console.log("✅ Root CA generated successfully");
+  console.info("[INFO] [CERT] Root CA generated successfully");
   return { key: ROOT_CA_KEY_PATH, cert: ROOT_CA_CERT_PATH };
 }
 
