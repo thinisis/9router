@@ -2,7 +2,18 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import PropTypes from "prop-types";
-import { Card, Badge, Button, Modal, Input, Select, Toggle, EditConnectionModal, ConfirmModal } from "@/shared/components";
+import {
+  Card,
+  Badge,
+  Button,
+  Modal,
+  Input,
+  Select,
+  Toggle,
+  EditConnectionModal,
+  ConfirmModal,
+  InlineFeedback,
+} from "@/shared/components";
 
 // ── CooldownTimer ──────────────────────────────────────────────
 function CooldownTimer({ until }) {
