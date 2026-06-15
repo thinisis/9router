@@ -2,16 +2,11 @@
 
 import PropTypes from "prop-types";
 import Badge from "./Badge";
+import ConnectionErrorIndicator from "./ConnectionErrorIndicator";
 import { translate } from "@/i18n/runtime";
 
 function formatConnectedLabel(count) {
   return `${count} ${translate("connected")}`;
-}
-
-function formatErrorLabel(count, errorCode) {
-  const unit = translate(count === 1 ? "error" : "errors");
-  if (errorCode) return `${count} ${unit} (${errorCode})`;
-  return `${count} ${unit}`;
 }
 
 export default function ProviderConnectionStatus({
@@ -46,18 +41,21 @@ export default function ProviderConnectionStatus({
 
   const badges = [];
 
+  if (error > 0) {
+    badges.push(
+      <ConnectionErrorIndicator
+        key="error"
+        count={error}
+        errorCode={errorCode}
+        size="sm"
+      />,
+    );
+  }
+
   if (connected > 0) {
     badges.push(
       <Badge key="connected" variant="success" size="sm" dot>
         {formatConnectedLabel(connected)}
-      </Badge>
-    );
-  }
-
-  if (error > 0) {
-    badges.push(
-      <Badge key="error" variant="error" size="sm" dot>
-        {formatErrorLabel(error, errorCode)}
       </Badge>
     );
   }

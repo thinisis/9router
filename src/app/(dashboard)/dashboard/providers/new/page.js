@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Card, Button, Input, Select, Toggle } from "@/shared/components";
+import { Card, Button, Input, Select, Toggle, PageBackLink } from "@/shared/components";
 import { AI_PROVIDERS, AUTH_METHODS } from "@/shared/constants/config";
 
 const providerOptions = Object.values(AI_PROVIDERS).map((p) => ({
@@ -76,13 +76,7 @@ export default function NewProviderPage() {
     <div className="w-full min-w-0">
       {/* Header */}
       <div className="mb-8">
-        <Link
-          href="/dashboard/providers"
-          className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-primary transition-colors"
-        >
-          <span className="material-symbols-outlined text-lg">arrow_back</span>
-          Back to Providers
-        </Link>
+        <PageBackLink href="/dashboard/providers" label="Back to Providers" />
       </div>
 
       {/* Form */}

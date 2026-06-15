@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Card, Button, Badge, Input, Modal, CardSkeleton, OAuthModal, KiroOAuthWrapper, CursorAuthModal, IFlowCookieModal, GitLabAuthModal, Toggle, Select, EditConnectionModal, NoAuthProxyCard, ConfirmModal } from "@/shared/components";
+import { Card, Button, Badge, Input, Modal, CardSkeleton, OAuthModal, KiroOAuthWrapper, CursorAuthModal, IFlowCookieModal, GitLabAuthModal, Toggle, Select, EditConnectionModal, NoAuthProxyCard, ConfirmModal, PageBackLink } from "@/shared/components";
 import GlassAlert from "@/shared/components/GlassAlert";
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, WEB_COOKIE_PROVIDERS, getProviderAlias, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, AI_PROVIDERS, THINKING_CONFIG } from "@/shared/constants/providers";
 import { getModelsByProviderId } from "@/shared/constants/models";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
-import { translate } from "@/i18n/runtime";
+import { translate, translateFormat } from "@/i18n/runtime";
 import { fetchSuggestedModels } from "@/shared/utils/providerModelsFetcher";
 import PassthroughModelsSection from "./PassthroughModelsSection";
 import ModelsManagerPanel from "../components/ModelsManagerPanel";
@@ -947,51 +947,72 @@ export default function ProviderDetailPage() {
     <div className="flex min-w-0 flex-col gap-6 px-1 sm:gap-8 sm:px-0">
       {/* Header */}
       <div className="min-w-0">
-        <Link
-          href="/dashboard/providers"
-          className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-primary transition-colors mb-4"
-        >
-          <span className="material-symbols-outlined text-lg">arrow_back</span>
-          Back to Providers
-        </Link>
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-          <div
-            className="flex size-12 shrink-0 items-center justify-center rounded-lg"
-            style={{ backgroundColor: `${providerInfo.color}15` }}
-          >
-            {headerImgError ? (
-              <span className="text-sm font-bold" style={{ color: providerInfo.color }}>
-                {providerInfo.textIcon || providerInfo.id.slice(0, 2).toUpperCase()}
-              </span>
-            ) : (
-              <Image
-                src={getHeaderIconPath()}
-                alt={providerInfo.name}
-                width={48}
-                height={48}
-                className="max-h-12 max-w-12 rounded-lg object-contain"
-                sizes="48px"
-                onError={() => setHeaderImgError(true)}
-              />
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
+        <PageBackLink href="/dashboard/providers" label="Back to Providers" className="mb-4" />
+        <div className="provider-detail-header glass-panel-subtle rounded-2xl p-4 sm:p-5">
+          <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
+            <div
+              className="flex size-12 shrink-0 items-center justify-center rounded-xl glass-panel-subtle sm:size-14"
+              style={{ backgroundColor: `${providerInfo.color}15` }}
+            >
+              {headerImgError ? (
+                <span className="text-sm font-bold sm:text-base" style={{ color: providerInfo.color }}>
+                  {providerInfo.textIcon || providerInfo.id.slice(0, 2).toUpperCase()}
+                </span>
+              ) : (
+                <Image
+                  src={getHeaderIconPath()}
+                  alt={providerInfo.name}
+                  width={56}
+                  height={56}
+                  className="max-h-12 max-w-12 rounded-lg object-contain sm:max-h-14 sm:max-w-14"
+                  sizes="56px"
+                  onError={() => setHeaderImgError(true)}
+                />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="font-display text-xl font-semibold text-text-main truncate sm:text-2xl">
+                {providerInfo.name}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2" data-i18n-skip>
+                <StatusMetricChip
+                  icon="link"
+                  label={translate("connected")}
+                  value={connections.filter((c) => c.isActive !== false).length}
+                  variant="info"
+                  hideWhenZero={false}
+                />
+                <StatusMetricChip
+                  icon="link_off"
+                  label={translate("errors")}
+                  value={connections.filter(
+                    (c) =>
+                      c.isActive !== false &&
+                      (c.testStatus === "error" || c.testStatus === "expired" || c.lastError),
+                  ).length}
+                  variant="danger"
+                  iconOnly
+                  title={translate("Connection error")}
+                />
+                <span className="text-xs text-text-muted">
+                  {translateFormat(
+                    connections.length === 1 ? "{count} connection" : "{count} connections",
+                    { count: connections.length },
+                  )}
+                </span>
+              </div>
               {(providerInfo.notice?.apiKeyUrl || providerInfo.notice?.signupUrl || providerInfo.website) && (
                 <a
                   href={providerInfo.notice?.apiKeyUrl || providerInfo.notice?.signupUrl || providerInfo.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
                 >
                   <span className="material-symbols-outlined text-sm">open_in_new</span>
-                  {providerInfo.notice?.apiKeyUrl ? "Get API Key" : "Sign up / Learn more"}
+                  {providerInfo.notice?.apiKeyUrl ? translate("Get API Key") : translate("Sign up / Learn more")}
                 </a>
               )}
             </div>
-            <p className="text-text-muted">
-              {connections.length} connection{connections.length === 1 ? "" : "s"}
-            </p>
           </div>
         </div>
       </div>

@@ -50,13 +50,17 @@ export default function LoginPage() {
   useGSAP(
     () => {
       if (hasPassword === null) return;
-      if (prefersReducedMotion()) return;
+      if (prefersReducedMotion()) {
+        gsap.set("[data-login-brand],[data-login-feature],[data-login-card],[data-login-credit]", { autoAlpha: 1, x: 0, y: 0, scale: 1 });
+        return;
+      }
       ensureGsapRegistered();
-      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-      tl.from("[data-login-brand]", { x: -28, autoAlpha: 0, duration: 0.62 })
-        .from("[data-login-feature]", { y: 14, autoAlpha: 0, duration: 0.4, stagger: 0.08 }, "-=0.35")
-        .from("[data-login-card]", { y: 22, autoAlpha: 0, scale: 0.98, duration: 0.48 }, "-=0.28")
-        .from("[data-login-credit]", { autoAlpha: 0, y: 8, duration: 0.28 }, "-=0.12");
+      gsap.set("[data-login-brand],[data-login-feature],[data-login-card],[data-login-credit]", { autoAlpha: 1 });
+      const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
+      tl.from("[data-login-brand]", { x: -12, duration: 0.28 })
+        .from("[data-login-feature]", { y: 6, duration: 0.22, stagger: 0.04 }, "-=0.18")
+        .from("[data-login-card]", { y: 8, scale: 0.995, duration: 0.26 }, "-=0.14")
+        .from("[data-login-credit]", { y: 4, duration: 0.18 }, "-=0.1");
     },
     { scope: pageRef, dependencies: [hasPassword] }
   );
@@ -216,18 +220,7 @@ export default function LoginPage() {
       ? "Sign in with your identity provider to access the control plane."
       : "Authenticate to manage providers, endpoints, and routing.";
 
-  if (hasPassword === null) {
-    return (
-      <div className="login-shell">
-        <div className="liquid-bg" aria-hidden="true" />
-        <div className="login-orbs" aria-hidden="true" />
-        <div className="login-loading">
-          <div className="login-loading-ring" />
-          <p className="text-sm text-text-muted">Preparing sign-in…</p>
-        </div>
-      </div>
-    );
-  }
+  const authPending = hasPassword === null;
 
   const urlError =
     typeof window !== "undefined"
@@ -288,6 +281,13 @@ export default function LoginPage() {
           </div>
 
           <div ref={cardRef} className="login-glass-card" data-login-card>
+            {authPending && (
+              <div className="login-card-pending" aria-live="polite">
+                <div className="login-loading-ring login-loading-ring--sm" />
+                <span className="text-xs text-text-muted">Preparing sign-in…</span>
+              </div>
+            )}
+            <div className={`login-card-body ${authPending ? "login-card-body--pending" : ""}`}>
             <div className="login-card-header">
               <h2 className="login-card-title">
                 {mustChange ? "Set new password" : "Sign in"}
@@ -414,6 +414,7 @@ export default function LoginPage() {
                   )}
                 </div>
               )}
+            </div>
             </div>
           </div>
 

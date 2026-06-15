@@ -3,6 +3,7 @@
 import { useState } from "react";
 import PropTypes from "prop-types";
 import { cn } from "@/shared/utils/cn";
+import { translate } from "@/i18n/runtime";
 import { getInputTokens } from "./utils";
 
 function StatChip({ icon, label, value, mono = false }) {
@@ -49,7 +50,7 @@ export default function RequestDetailSummary({ detail, providerName }) {
       <div className="request-detail-summary-header">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
-            Model
+            {translate("Model")}
           </p>
           <p className="truncate font-mono text-sm font-medium text-text-main sm:text-base">
             {detail.model}
@@ -70,17 +71,17 @@ export default function RequestDetailSummary({ detail, providerName }) {
 
       <div className="request-detail-meta-grid">
         <div className="request-detail-meta-item">
-          <span className="request-detail-meta-label">Provider</span>
+          <span className="request-detail-meta-label">{translate("Provider")}</span>
           <span className="request-detail-meta-value">{providerName}</span>
         </div>
         <div className="request-detail-meta-item">
-          <span className="request-detail-meta-label">Timestamp</span>
+          <span className="request-detail-meta-label">{translate("Timestamp")}</span>
           <span className="request-detail-meta-value tabular-nums">
             {new Date(detail.timestamp).toLocaleString()}
           </span>
         </div>
         <div className="request-detail-meta-item sm:col-span-2">
-          <span className="request-detail-meta-label">Request ID</span>
+          <span className="request-detail-meta-label">{translate("Request ID")}</span>
           <div className="flex items-start gap-2">
             <span className="request-detail-meta-value font-mono text-xs break-all flex-1">
               {detail.id}
@@ -89,8 +90,8 @@ export default function RequestDetailSummary({ detail, providerName }) {
               type="button"
               className="request-detail-copy-id"
               onClick={handleCopyId}
-              title="Copy request ID"
-              aria-label="Copy request ID"
+              title={translate("Copy request ID")}
+              aria-label={translate("Copy request ID")}
             >
               <span className="material-symbols-outlined text-[14px]">
                 {idCopied ? "check" : "content_copy"}
@@ -100,7 +101,7 @@ export default function RequestDetailSummary({ detail, providerName }) {
         </div>
         {detail.connectionId && (
           <div className="request-detail-meta-item sm:col-span-2">
-            <span className="request-detail-meta-label">Connection</span>
+            <span className="request-detail-meta-label">{translate("Connection")}</span>
             <span className="request-detail-meta-value font-mono text-xs break-all">
               {detail.connectionId}
             </span>
@@ -111,13 +112,13 @@ export default function RequestDetailSummary({ detail, providerName }) {
       <div className="request-detail-stat-row">
         <StatChip
           icon="input"
-          label="Input"
+          label={translate("Input")}
           value={inputTokens.toLocaleString()}
           mono
         />
         <StatChip
           icon="output"
-          label="Output"
+          label={translate("Output")}
           value={outputTokens.toLocaleString()}
           mono
         />
@@ -136,7 +137,7 @@ export default function RequestDetailSummary({ detail, providerName }) {
         {cachedTokens > 0 && (
           <StatChip
             icon="cached"
-            label="Cached"
+            label={translate("Cached")}
             value={cachedTokens.toLocaleString()}
             mono
           />
@@ -144,7 +145,7 @@ export default function RequestDetailSummary({ detail, providerName }) {
         {reasoningTokens > 0 && (
           <StatChip
             icon="psychology"
-            label="Reasoning"
+            label={translate("Reasoning")}
             value={reasoningTokens.toLocaleString()}
             mono
           />

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { cn } from "@/shared/utils/cn";
+import { translate, translateFormat } from "@/i18n/runtime";
 import { formatPayload, payloadMeta } from "./utils";
 
 const COLLAPSED_MAX_H = 280;
@@ -36,8 +37,11 @@ export default function RequestDetailPayload({
   return (
     <div className="request-detail-payload">
       <div className="request-detail-payload-toolbar">
-        <span className="request-detail-payload-meta">
-          {lines} lines · {chars.toLocaleString()} chars
+        <span className="request-detail-payload-meta" data-i18n-skip>
+          {translateFormat("{lines} lines · {chars} chars", {
+            lines,
+            chars: chars.toLocaleString(),
+          })}
         </span>
         <div className="flex items-center gap-1">
           {isLong && (
@@ -49,14 +53,18 @@ export default function RequestDetailPayload({
               <span className="material-symbols-outlined text-[16px]">
                 {expanded ? "unfold_less" : "unfold_more"}
               </span>
-              {expanded ? "Collapse" : "Expand"}
+              <span className="request-detail-payload-btn__label">
+                {expanded ? translate("Collapse") : translate("Expand")}
+              </span>
             </button>
           )}
           <button type="button" className="request-detail-payload-btn" onClick={handleCopy}>
             <span className="material-symbols-outlined text-[16px]">
               {copied ? "check" : "content_copy"}
             </span>
-            {copied ? "Copied" : "Copy"}
+            <span className="request-detail-payload-btn__label">
+              {copied ? translate("Copied") : translate("Copy")}
+            </span>
           </button>
         </div>
       </div>

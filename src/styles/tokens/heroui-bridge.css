@@ -91,6 +91,17 @@
   box-shadow: var(--lg-shadow-float), var(--lg-shadow-elevated) !important;
 }
 
+/* Drawer panel */
+.dashboard-shell [data-slot="drawer-dialog"] {
+  background:
+    linear-gradient(180deg, var(--lg-tint-hover) 0%, transparent 32%),
+    var(--lg-glass-modal) !important;
+  backdrop-filter: blur(var(--lg-blur-modal)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur-modal)) saturate(var(--lg-saturate));
+  border: 1px solid var(--lg-stroke-outer) !important;
+  box-shadow: var(--lg-shadow-float) !important;
+}
+
 /* Modal / dialog */
 .dashboard-shell [data-slot="dialog"] {
   background:

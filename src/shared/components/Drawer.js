@@ -3,13 +3,15 @@
 import { Drawer as HeroDrawer, useOverlayState } from "@heroui/react";
 import { cn } from "@/shared/utils/cn";
 
-const WIDTHS = {
-  sm: "w-[min(100vw,400px)]",
-  md: "w-[min(100vw,500px)]",
-  lg: "w-[min(100vw,600px)]",
-  xl: "w-[min(100vw,800px)]",
-  "2xl": "w-[min(100vw,960px)]",
-  full: "w-full",
+/** Width applies to Drawer.Dialog (panel), not Drawer.Content (viewport flex shell). */
+const DIALOG_WIDTHS = {
+  sm: "w-[min(100vw,400px)] max-w-[100vw]",
+  md: "w-[min(100vw,500px)] max-w-[100vw]",
+  lg: "w-[min(100vw,600px)] max-w-[100vw]",
+  xl: "w-[min(100vw,800px)] max-w-[100vw]",
+  "2xl": "w-[min(100vw,960px)] max-w-[100vw]",
+  "3xl": "w-full max-w-[100vw] sm:w-[min(92vw,1100px)]",
+  full: "w-full max-w-[100vw]",
 };
 
 export default function Drawer({
@@ -32,11 +34,14 @@ export default function Drawer({
   return (
     <HeroDrawer state={state}>
       <HeroDrawer.Backdrop isDismissable>
-        <HeroDrawer.Content
-          placement="right"
-          className={cn(WIDTHS[width] || WIDTHS.md, className)}
-        >
-          <HeroDrawer.Dialog className="glass-popup">
+        <HeroDrawer.Content placement="right">
+          <HeroDrawer.Dialog
+            className={cn(
+              "glass-popup",
+              DIALOG_WIDTHS[width] || DIALOG_WIDTHS.md,
+              className,
+            )}
+          >
             {title && (
               <HeroDrawer.Header className="flex items-center justify-between gap-3 border-b border-divider">
                 <HeroDrawer.Heading className="font-display text-lg font-semibold">

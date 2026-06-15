@@ -1,10 +1,12 @@
 "use client";
 
 import PropTypes from "prop-types";
-import Drawer from "@/shared/components/Drawer";
+import { Drawer as HeroDrawer, useOverlayState } from "@heroui/react";
+import { translate } from "@/i18n/runtime";
 import RequestDetailSummary from "./RequestDetailSummary";
 import RequestDetailError from "./RequestDetailError";
 import RequestDetailPipeline from "./RequestDetailPipeline";
+import RequestDetailFlowHero from "./RequestDetailFlowHero";
 
 export default function RequestDetailDrawer({
   isOpen,
@@ -12,61 +14,57 @@ export default function RequestDetailDrawer({
   detail,
   providerName,
 }) {
-  if (!detail) {
-    return (
-      <Drawer
-        isOpen={isOpen}
-        onClose={onClose}
-        title="Request Details"
-        width="2xl"
-        className="request-detail-drawer"
-      >
-        <div className="py-12 text-center text-text-muted text-sm">No request selected</div>
-      </Drawer>
-    );
-  }
+  const state = useOverlayState({
+    isOpen,
+    onOpenChange: (open) => {
+      if (!open) onClose();
+    },
+  });
 
-  const isError = detail.status === "error";
-  const errorMessage = detail.response?.error;
+  if (!isOpen) return null;
+
+  const isError = detail?.status === "error";
+  const errorMessage = detail?.response?.error;
 
   return (
-    <Drawer
-      isOpen={isOpen}
-      onClose={onClose}
-      width="2xl"
-      className="request-detail-drawer"
-      title={null}
-    >
-      <div className="request-detail-drawer-inner">
-        <div className="request-detail-drawer-hero">
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-lg font-semibold text-text-main">Request Details</p>
-            <p className="text-xs text-text-muted mt-0.5">
-              End-to-end pipeline: client → provider → client
-            </p>
-          </div>
-          <button
-            type="button"
-            className="request-detail-drawer-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <span className="material-symbols-outlined text-[20px]">close</span>
-          </button>
-        </div>
+    <HeroDrawer state={state}>
+      <HeroDrawer.Backdrop isDismissable>
+        <HeroDrawer.Content placement="right">
+          <HeroDrawer.Dialog className="request-detail-dialog glass-popup">
+            <HeroDrawer.Header className="request-detail-dialog__header">
+              <div className="request-detail-dialog__header-main">
+                <HeroDrawer.Heading className="request-detail-dialog__title">
+                  {translate("Request Details")}
+                </HeroDrawer.Heading>
+                {detail ? <RequestDetailFlowHero /> : null}
+              </div>
+              <HeroDrawer.CloseTrigger />
+            </HeroDrawer.Header>
 
-        <RequestDetailSummary detail={detail} providerName={providerName} />
+            <HeroDrawer.Body className="request-detail-dialog__body custom-scrollbar">
+              {!detail ? (
+                <p className="py-10 text-center text-sm text-default-500">
+                  {translate("No request selected")}
+                </p>
+              ) : (
+                <div className="request-detail-dialog__stack">
+                  <RequestDetailSummary detail={detail} providerName={providerName} />
 
-        {isError && (
-          <RequestDetailError
-            message={errorMessage}
-            statusCode={detail.response?.status}
-          />
-        )}
+                  {isError ? (
+                    <RequestDetailError
+                      message={errorMessage}
+                      statusCode={detail.response?.status}
+                    />
+                  ) : null}
 
-        <RequestDetailPipeline key={detail.id} detail={detail} />
-      </div>
-    </Drawer>
+                  <RequestDetailPipeline key={detail.id} detail={detail} />
+                </div>
+              )}
+            </HeroDrawer.Body>
+          </HeroDrawer.Dialog>
+        </HeroDrawer.Content>
+      </HeroDrawer.Backdrop>
+    </HeroDrawer>
   );
 }
 

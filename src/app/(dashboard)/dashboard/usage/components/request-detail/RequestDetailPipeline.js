@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
+import Button from "@/shared/components/Button";
+import { translate } from "@/i18n/runtime";
 import RequestDetailSection from "./RequestDetailSection";
 import RequestDetailPayload from "./RequestDetailPayload";
 
@@ -49,25 +51,25 @@ export default function RequestDetailPipeline({ detail }) {
   return (
     <div className="request-detail-pipeline">
       <div className="request-detail-pipeline-header">
-        <p className="request-detail-pipeline-label">Payload pipeline</p>
+        <p className="request-detail-pipeline-label">{translate("Payload pipeline")}</p>
         <div className="request-detail-pipeline-actions">
-          <button type="button" className="request-detail-pipeline-btn" onClick={expandAll}>
-            Expand all
-          </button>
-          <button type="button" className="request-detail-pipeline-btn" onClick={collapseAll}>
-            Collapse all
-          </button>
+          <Button type="button" variant="ghost" size="sm" onClick={expandAll}>
+            {translate("Expand all")}
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={collapseAll}>
+            {translate("Collapse all")}
+          </Button>
         </div>
       </div>
 
       <RequestDetailSection
         step={step++}
-        title="Client Request"
-        subtitle="Incoming API payload from the client"
+        title={translate("Client Request")}
+        subtitle={translate("Incoming API payload from the client")}
         icon="input"
         open={openSections["client-request"]}
         onOpenChange={(value) => setSectionOpen("client-request", value)}
-        badge="Input"
+        badge={translate("Input")}
       >
         <RequestDetailPayload value={detail.request} emptyLabel="{}" />
       </RequestDetailSection>
@@ -75,12 +77,12 @@ export default function RequestDetailPipeline({ detail }) {
       {hasProviderRequest && (
         <RequestDetailSection
           step={step++}
-          title="Provider Request"
-          subtitle="Translated payload sent upstream"
+          title={translate("Provider Request")}
+          subtitle={translate("Translated payload sent upstream")}
           icon="translate"
           open={openSections["provider-request"]}
           onOpenChange={(value) => setSectionOpen("provider-request", value)}
-          badge="Upstream"
+          badge={translate("Upstream")}
         >
           <RequestDetailPayload value={detail.providerRequest} emptyLabel="{}" />
         </RequestDetailSection>
@@ -89,12 +91,12 @@ export default function RequestDetailPipeline({ detail }) {
       {hasProviderResponse && (
         <RequestDetailSection
           step={step++}
-          title="Provider Response"
-          subtitle="Raw response from the provider"
+          title={translate("Provider Response")}
+          subtitle={translate("Raw response from the provider")}
           icon="data_object"
           open={openSections["provider-response"]}
           onOpenChange={(value) => setSectionOpen("provider-response", value)}
-          badge="Raw"
+          badge={translate("Raw")}
         >
           <RequestDetailPayload value={detail.providerResponse} emptyLabel="{}" />
         </RequestDetailSection>
@@ -102,30 +104,30 @@ export default function RequestDetailPipeline({ detail }) {
 
       <RequestDetailSection
         step={step}
-        title="Client Response"
-        subtitle="Final payload returned to the client"
+        title={translate("Client Response")}
+        subtitle={translate("Final payload returned to the client")}
         icon="output"
         open={openSections["client-response"]}
         onOpenChange={(value) => setSectionOpen("client-response", value)}
-        badge="Output"
+        badge={translate("Output")}
       >
         {hasThinking && (
           <div className="mb-4">
             <p className="request-detail-inline-label">
               <span className="material-symbols-outlined text-[15px]">psychology</span>
-              Thinking
+              {translate("Thinking")}
             </p>
             <RequestDetailPayload
               value={detail.response.thinking}
               variant="thinking"
-              emptyLabel="[No thinking]"
+              emptyLabel={translate("[No thinking]")}
             />
           </div>
         )}
-        <p className="request-detail-inline-label mb-2">Content</p>
+        <p className="request-detail-inline-label mb-2">{translate("Content")}</p>
         <RequestDetailPayload
           value={detail.response?.content ?? detail.response?.error}
-          emptyLabel="[No content]"
+          emptyLabel={translate("[No content]")}
         />
       </RequestDetailSection>
     </div>

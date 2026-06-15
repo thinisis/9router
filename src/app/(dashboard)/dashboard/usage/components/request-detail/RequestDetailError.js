@@ -1,6 +1,7 @@
 "use client";
 
 import PropTypes from "prop-types";
+import { translate } from "@/i18n/runtime";
 
 export default function RequestDetailError({ message, statusCode }) {
   if (!message) return null;
@@ -12,7 +13,7 @@ export default function RequestDetailError({ message, statusCode }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="request-detail-error-title">
-          Request failed
+          {translate("Request failed")}
           {statusCode != null && (
             <span className="request-detail-error-code">HTTP {statusCode}</span>
           )}

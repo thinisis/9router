@@ -23,6 +23,7 @@ export { default as ProviderSection } from "./ProviderSection";
 export { default as EmptyState } from "./EmptyState";
 export { default as PageContentSkeleton } from "./PageContentSkeleton";
 export { default as PageToolbar } from "./PageToolbar";
+export { default as PageBackLink } from "./PageBackLink";
 export { default as ToolSetupAlert } from "./ToolSetupAlert";
 export { default as CommandPalette } from "./CommandPalette";
 
@@ -53,6 +54,7 @@ export { default as SegmentedControl } from "./SegmentedControl";
 export { default as Tooltip } from "./Tooltip";
 export { default as ProviderInfoCard } from "./ProviderInfoCard";
 export { default as ProviderConnectionStatus } from "./ProviderConnectionStatus";
+export { default as ConnectionErrorIndicator } from "./ConnectionErrorIndicator";
 export { default as BackupSectionsModal } from "./BackupSectionsModal";
 
 // Layouts

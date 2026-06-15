@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/shared/utils/cn";
+import { translate, translateFormat } from "@/i18n/runtime";
 import Button from "./Button";
 import Select from "./Select";
 
@@ -44,10 +45,12 @@ export default function Pagination({
     >
       {/* Info text */}
       {totalItems > 0 && (
-        <div className="text-sm text-text-muted">
-          Showing <span className="font-medium text-text-main">{startItem}</span> to{" "}
-          <span className="font-medium text-text-main">{endItem}</span> of{" "}
-          <span className="font-medium text-text-main">{totalItems}</span> results
+        <div className="text-sm text-text-muted" data-i18n-skip>
+          {translateFormat("Showing {start} to {end} of {total} results", {
+            start: startItem,
+            end: endItem,
+            total: totalItems,
+          })}
         </div>
       )}
 
@@ -55,7 +58,7 @@ export default function Pagination({
         {/* Page size selector */}
         {onPageSizeChange && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-text-muted">Rows:</span>
+            <span className="text-sm text-text-muted">{translate("Rows:")}</span>
             <Select
               value={String(pageSize)}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}

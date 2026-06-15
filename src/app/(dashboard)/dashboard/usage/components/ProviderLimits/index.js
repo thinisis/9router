@@ -9,6 +9,7 @@ import { parseQuotaData, calculatePercentage } from "./utils";
 import Card from "@/shared/components/Card";
 import { EditConnectionModal } from "@/shared/components";
 import { USAGE_SUPPORTED_PROVIDERS } from "@/shared/constants/providers";
+import { translate, translateFormat } from "@/i18n/runtime";
 
 function getConnectionLabel(connection) {
   const isEmail = (value) =>
@@ -137,7 +138,11 @@ function getPageSizeLabel(pageSize, isCustomPageSize) {
 
 function getConnectionsPaginationSummary(pagination) {
   const { start, end } = getConnectionsPageRange(pagination);
-  return `Showing ${start}-${end} of ${pagination.total}`;
+  return translateFormat("Showing {start}-{end} of {total}", {
+    start,
+    end,
+    total: pagination.total,
+  });
 }
 
 function getSafePagination(pagination, fallbackPageSize) {
@@ -207,16 +212,21 @@ function setQuotaCache(connectionId, quotaEntry) {
 const REFRESH_INTERVAL_MS = 60000; // 60 seconds
 const DEPLETED_QUOTA_THRESHOLD = 5; // percent
 const AUTO_REFRESH_STORAGE_KEY = "quotaAutoRefresh";
-const ACCOUNT_FILTER_OPTIONS = [
-  { value: "all", label: "All accounts" },
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Turned off" },
-];
-const QUOTA_SORT_OPTIONS = [
-  { value: "default", label: "Default quota order" },
-  { value: "remaining-asc", label: "% quota: low to high" },
-  { value: "remaining-desc", label: "% quota: high to low" },
-];
+function getAccountFilterOptions() {
+  return [
+    { value: "all", label: translate("All accounts") },
+    { value: "active", label: translate("Active") },
+    { value: "inactive", label: translate("Turned off") },
+  ];
+}
+
+function getQuotaSortOptions() {
+  return [
+    { value: "default", label: translate("Default quota order") },
+    { value: "remaining-asc", label: translate("% quota: low to high") },
+    { value: "remaining-desc", label: translate("% quota: high to low") },
+  ];
+}
 const CONNECTIONS_PAGE_SIZE = 20;
 const ACCOUNT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 const ACCOUNT_PAGE_SIZE_MAX = 500;
@@ -693,7 +703,7 @@ export default function ProviderLimits() {
   };
 
   const selectedProviderLabel =
-    providerFilter === "all" ? "All providers" : providerFilter;
+    providerFilter === "all" ? translate("All providers") : providerFilter;
   const hasEligibleConnections = totals.eligibleConnections > 0;
   const hasVisibleConnections = sortedConnections.length > 0;
   const emptyState = getConnectionsEmptyMessage(
@@ -754,7 +764,7 @@ export default function ProviderLimits() {
               className="flex h-8 items-center justify-between gap-1 rounded-lg border border-black/10 bg-black/[0.02] px-2 text-xs text-text-primary transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/10"
               aria-haspopup="menu"
               aria-expanded={providerMenuOpen}
-              title="Filter quota providers"
+              title={translate("Filter quota providers")}
             >
               <span className="flex min-w-0 items-center gap-1.5">
                 {providerFilter === "all" ? (
@@ -802,7 +812,7 @@ export default function ProviderLimits() {
                     <span className="material-symbols-outlined text-[22px]">
                       apps
                     </span>
-                    <span className="font-medium">All providers</span>
+                    <span className="font-medium">{translate("All providers")}</span>
                     {providerFilter === "all" && (
                       <span className="material-symbols-outlined ml-auto text-[20px]">
                         check
@@ -856,9 +866,9 @@ export default function ProviderLimits() {
               setAccountFilter(nextValue);
             }}
             className="h-8 rounded-lg border border-black/10 bg-black/[0.02] px-2 text-xs text-text-primary outline-none transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/10"
-            aria-label="Filter accounts by status"
+            aria-label={translate("Filter accounts by status")}
           >
-            {ACCOUNT_FILTER_OPTIONS.map((option) => (
+            {getAccountFilterOptions().map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -870,9 +880,9 @@ export default function ProviderLimits() {
               value={quotaSortMode}
               onChange={(event) => setQuotaSortMode(event.target.value)}
               className="h-8 rounded-lg border border-black/10 bg-black/[0.02] px-2 text-xs text-text-primary outline-none transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/10"
-              aria-label="Sort Codex quotas by remaining"
+              aria-label={translate("Sort Codex quotas by remaining")}
             >
-              {QUOTA_SORT_OPTIONS.map((option) => (
+              {getQuotaSortOptions().map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -885,12 +895,12 @@ export default function ProviderLimits() {
             onClick={() => setExpiringFirst((prev) => !prev)}
             aria-pressed={expiringFirst}
             className={`flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-xs transition-colors ${expiringFirst ? "border-amber-500/40 bg-amber-500/10 text-amber-500" : "border-black/10 text-text-primary hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"}`}
-            title="Sort accounts by earliest quota reset time"
+            title={translate("Sort accounts by earliest quota reset time")}
           >
             <span className="material-symbols-outlined text-[14px]">
               hourglass_top
             </span>
-            <span className="hidden sm:inline">Expiring first</span>
+            <span className="hidden sm:inline">{translate("Expiring first")}</span>
           </button>
 
           {/* Bulk: disable depleted */}
@@ -899,10 +909,10 @@ export default function ProviderLimits() {
             onClick={handleDisableDepleted}
             disabled={bulkToggling}
             className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-red-500/30 px-2 text-xs text-red-500 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-            title="Disable connections with depleted quota on the current page"
+            title={translate("Disable connections with depleted quota on the current page")}
           >
             <span className="material-symbols-outlined text-[14px]">block</span>
-            <span className="hidden sm:inline">Turn off Empty</span>
+            <span className="hidden sm:inline">{translate("Turn off Empty")}</span>
           </button>
 
           {/* Bulk: enable available */}
@@ -911,12 +921,12 @@ export default function ProviderLimits() {
             onClick={handleEnableAvailable}
             disabled={bulkToggling}
             className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-emerald-500/30 px-2 text-xs text-emerald-500 transition-colors hover:bg-emerald-500/10 disabled:opacity-50"
-            title="Enable connections that still have quota on the current page"
+            title={translate("Enable connections that still have quota on the current page")}
           >
             <span className="material-symbols-outlined text-[14px]">
               check_circle
             </span>
-            <span className="hidden sm:inline">Turn on Available</span>
+            <span className="hidden sm:inline">{translate("Turn on Available")}</span>
           </button>
 
           {/* Auto-refresh toggle */}
@@ -1107,7 +1117,9 @@ export default function ProviderLimits() {
 
       <div className="rounded-xl border border-black/10 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs text-text-muted">{connectionsPageSummary}</span>
+            <span className="text-xs text-text-muted" data-i18n-skip>
+              {connectionsPageSummary}
+            </span>
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={isCustomPageSize ? "custom" : String(pageSize)}
@@ -1165,7 +1177,12 @@ export default function ProviderLimits() {
                 aria-label="Custom accounts per page"
                 placeholder="Custom"
               />
-              <span className="text-xs text-text-muted">Page {pagination.page} / {pagination.totalPages}</span>
+              <span className="text-xs text-text-muted" data-i18n-skip>
+                {translateFormat("Page {current} / {total}", {
+                  current: pagination.page,
+                  total: pagination.totalPages,
+                })}
+              </span>
             </div>
             <div className="flex items-center gap-1.5">
               <button

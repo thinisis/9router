@@ -119,6 +119,15 @@ export function translate(text) {
   return translationMap[trimmed] || translationMap[text] || text;
 }
 
+/** Replace `{key}` placeholders after looking up the template in the locale map. */
+export function translateFormat(template, vars = {}) {
+  let result = translate(template);
+  for (const [key, value] of Object.entries(vars)) {
+    result = result.replace(new RegExp(`\\{${key}\\}`, "g"), String(value));
+  }
+  return result;
+}
+
 export function getCurrentLocale() {
   return currentLocale;
 }

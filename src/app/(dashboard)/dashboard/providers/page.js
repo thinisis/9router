@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import {
   Card,
@@ -12,6 +12,7 @@ import {
   Modal,
   Select,
   Toggle,
+  ConnectionErrorIndicator,
 } from "@/shared/components";
 import ProviderIcon from "@/shared/components/ProviderIcon";
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS } from "@/shared/constants/config";
@@ -23,53 +24,78 @@ import {
   ANTHROPIC_COMPATIBLE_PREFIX,
 } from "@/shared/constants/providers";
 import Link from "next/link";
-import { getErrorCode, getRelativeTime } from "@/shared/utils";
 import { useNotificationStore } from "@/store/notificationStore";
 import { useHeaderSearchStore } from "@/store/headerSearchStore";
 import ModelAvailabilityBadge from "./components/ModelAvailabilityBadge";
 import PageContentSkeleton from "@/shared/components/PageContentSkeleton";
+import {
+  classifyProvider,
+  getProviderStatsFromConnections,
+  getProvidersWithErrors,
+  groupProvidersWithErrorsByCategory,
+} from "@/shared/utils/providerConnectionStats";
+import { translate } from "@/i18n/runtime";
 
-function getConnectionErrorTag(connection) {
-  if (!connection) return null;
-
-  const explicitType = connection.lastErrorType;
-  if (explicitType === "runtime_error") return "RUNTIME";
-  if (
-    explicitType === "upstream_auth_error" ||
-    explicitType === "auth_missing" ||
-    explicitType === "token_refresh_failed" ||
-    explicitType === "token_expired"
-  )
-    return "AUTH";
-  if (explicitType === "upstream_rate_limited") return "429";
-  if (explicitType === "upstream_unavailable") return "5XX";
-  if (explicitType === "network_error") return "NET";
-
-  const numericCode = Number(connection.errorCode);
-  if (Number.isFinite(numericCode) && numericCode >= 400)
-    return String(numericCode);
-
-  const fromMessage = getErrorCode(connection.lastError);
-  if (fromMessage === "401" || fromMessage === "403") return "AUTH";
-  if (fromMessage && fromMessage !== "ERR") return fromMessage;
-
-  const msg = (connection.lastError || "").toLowerCase();
-  if (
-    msg.includes("runtime") ||
-    msg.includes("not runnable") ||
-    msg.includes("not installed")
-  )
-    return "RUNTIME";
-  if (
-    msg.includes("invalid api key") ||
-    msg.includes("token invalid") ||
-    msg.includes("revoked") ||
-    msg.includes("unauthorized")
-  )
-    return "AUTH";
-
-  return "ERR";
+function resolveProviderMeta(providerId, providerNodes) {
+  const node = providerNodes.find((n) => n.id === providerId);
+  const info =
+    OAUTH_PROVIDERS[providerId] ||
+    APIKEY_PROVIDERS[providerId] ||
+    FREE_PROVIDERS[providerId] ||
+    FREE_TIER_PROVIDERS[providerId] ||
+    WEB_COOKIE_PROVIDERS[providerId];
+  const name = node?.name || info?.name || providerId;
+  return { name, ...classifyProvider(providerId, node) };
 }
+
+function ProviderErrorGroup({ categoryIcon, categoryLabel, items }) {
+  if (!items.length) return null;
+  return (
+    <div className="providers-error-group">
+      <span
+        className="providers-error-group__category"
+        title={categoryLabel}
+        aria-label={categoryLabel}
+      >
+        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+          {categoryIcon}
+        </span>
+      </span>
+      <span className="providers-error-group__list">
+        {items.map((item, index) => (
+          <span key={item.id} className="providers-error-group__item">
+            {index > 0 ? (
+              <span className="providers-error-group__sep" aria-hidden="true">
+                ·
+              </span>
+            ) : null}
+            <Link href={item.href} className="providers-error-group__link">
+              {item.name}
+            </Link>
+            {item.mediaKindLabel ? (
+              <span className="providers-error-group__kind">{item.mediaKindLabel}</span>
+            ) : null}
+            <ConnectionErrorIndicator count={item.errors} size="xs" />
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+ProviderErrorGroup.propTypes = {
+  categoryIcon: PropTypes.string.isRequired,
+  categoryLabel: PropTypes.string.isRequired,
+  items: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      name: PropTypes.string.isRequired,
+      href: PropTypes.string.isRequired,
+      errors: PropTypes.number.isRequired,
+      mediaKindLabel: PropTypes.string,
+    }),
+  ).isRequired,
+};
 
 const APIKEY_INITIAL_VISIBLE = 20;
 
@@ -98,22 +124,31 @@ export default function ProvidersPage() {
     !searchQuery.trim() ||
     name.toLowerCase().includes(searchQuery.trim().toLowerCase());
 
-  const sortByPriority = (entries, authType) =>
+  const getProviderStats = (providerId) =>
+    getProviderStatsFromConnections(connections, providerId);
+
+  const sortByPriority = (entries) =>
     [...entries].sort(([ka, a], [kb, b]) => {
-      const sa = getProviderStats(ka, authType);
-      const sb = getProviderStats(kb, authType);
-      const ca = sa.connected > 0 ? 1 : 0;
-      const cb = sb.connected > 0 ? 1 : 0;
+      const sa = getProviderStats(ka);
+      const sb = getProviderStats(kb);
+      const ea = sa.error > 0 ? 1 : 0;
+      const eb = sb.error > 0 ? 1 : 0;
+      if (ea !== eb) return eb - ea;
+      const ca = sa.connected > 0 || sa.total > 0 ? 1 : 0;
+      const cb = sb.connected > 0 || sb.total > 0 ? 1 : 0;
       if (ca !== cb) return cb - ca;
       return (a.name || "").localeCompare(b.name || "");
     });
 
-  const sortItemsByPriority = (items, authType) =>
+  const sortItemsByPriority = (items) =>
     [...items].sort((a, b) => {
-      const sa = getProviderStats(a.id, authType);
-      const sb = getProviderStats(b.id, authType);
-      const ca = sa.connected > 0 ? 1 : 0;
-      const cb = sb.connected > 0 ? 1 : 0;
+      const sa = getProviderStats(a.id);
+      const sb = getProviderStats(b.id);
+      const ea = sa.error > 0 ? 1 : 0;
+      const eb = sb.error > 0 ? 1 : 0;
+      if (ea !== eb) return eb - ea;
+      const ca = sa.connected > 0 || sa.total > 0 ? 1 : 0;
+      const cb = sb.connected > 0 || sb.total > 0 ? 1 : 0;
       if (ca !== cb) return cb - ca;
       return (a.name || "").localeCompare(b.name || "");
     });
@@ -139,59 +174,23 @@ export default function ProvidersPage() {
     fetchData();
   }, []);
 
-  const getProviderStats = (providerId, authType) => {
-    const providerConnections = connections.filter(
-      (c) => c.provider === providerId && c.authType === authType,
-    );
+  const providersWithErrors = useMemo(
+    () =>
+      getProvidersWithErrors(connections, (id) => resolveProviderMeta(id, providerNodes)),
+    [connections, providerNodes],
+  );
 
-    const getEffectiveStatus = (conn) => {
-      const isCooldown = Object.entries(conn).some(
-        ([k, v]) =>
-          k.startsWith("modelLock_") && v && new Date(v).getTime() > Date.now(),
-      );
-      return conn.testStatus === "unavailable" && !isCooldown
-        ? "active"
-        : conn.testStatus;
-    };
-
-    const connected = providerConnections.filter((c) => {
-      const status = getEffectiveStatus(c);
-      return status === "active" || status === "success";
-    }).length;
-
-    const errorConns = providerConnections.filter((c) => {
-      const status = getEffectiveStatus(c);
-      return (
-        status === "error" || status === "expired" || status === "unavailable"
-      );
-    });
-
-    const error = errorConns.length;
-    const total = providerConnections.length;
-    const allDisabled =
-      total > 0 && providerConnections.every((c) => c.isActive === false);
-
-    const latestError = errorConns.sort(
-      (a, b) => new Date(b.lastErrorAt || 0) - new Date(a.lastErrorAt || 0),
-    )[0];
-    const errorCode = latestError ? getConnectionErrorTag(latestError) : null;
-    const errorTime = latestError?.lastErrorAt
-      ? getRelativeTime(latestError.lastErrorAt)
-      : null;
-
-    return { connected, error, total, errorCode, errorTime, allDisabled };
-  };
+  const { ai: aiProvidersWithErrors, media: mediaProvidersWithErrors } = useMemo(
+    () => groupProvidersWithErrorsByCategory(providersWithErrors),
+    [providersWithErrors],
+  );
 
   // Toggle all connections for a provider on/off
-  const handleToggleProvider = async (providerId, authType, newActive) => {
-    const providerConns = connections.filter(
-      (c) => c.provider === providerId && c.authType === authType,
-    );
+  const handleToggleProvider = async (providerId, newActive) => {
+    const providerConns = connections.filter((c) => c.provider === providerId);
     setConnections((prev) =>
       prev.map((c) =>
-        c.provider === providerId && c.authType === authType
-          ? { ...c, isActive: newActive }
-          : c,
+        c.provider === providerId ? { ...c, isActive: newActive } : c,
       ),
     );
     await Promise.allSettled(
@@ -267,7 +266,15 @@ export default function ProvidersPage() {
         (info.serviceKinds ?? ["llm"]).includes("llm") &&
         matchSearch(info.name),
     ),
-    "apikey",
+  );
+
+  const utilityApikeyEntries = sortByPriority(
+    Object.entries(APIKEY_PROVIDERS).filter(([key, info]) => {
+      if (info.hidden) return false;
+      if ((info.serviceKinds ?? ["llm"]).includes("llm")) return false;
+      if (!matchSearch(info.name)) return false;
+      return connections.some((c) => c.provider === key);
+    }),
   );
   const isApikeySearching = !!searchQuery.trim();
   const visibleApikeyEntries =
@@ -285,7 +292,8 @@ export default function ProvidersPage() {
     freeEntries.length > 0 ||
     freeTierEntries.length > 0 ||
     apikeyEntries.length > 0 ||
-    customProviderCount > 0;
+    customProviderCount > 0 ||
+    utilityApikeyEntries.length > 0;
 
   return (
     <div className="flex min-w-0 flex-col gap-6 px-1 sm:px-0">
@@ -293,6 +301,21 @@ export default function ProvidersPage() {
         <PageContentSkeleton rows={3} />
       ) : (
       <>
+      {providersWithErrors.length > 0 && !searchQuery.trim() && (
+        <div className="providers-error-summary" role="status" data-i18n-skip>
+          <ProviderErrorGroup
+            categoryIcon="psychology"
+            categoryLabel={translate("AI Provider")}
+            items={aiProvidersWithErrors}
+          />
+          <ProviderErrorGroup
+            categoryIcon="perm_media"
+            categoryLabel={translate("Media Provider")}
+            items={mediaProvidersWithErrors}
+          />
+        </div>
+      )}
+
       {!searchQuery.trim() && hasAnyResult && (
         <div className="providers-overview-bar glass-panel-subtle rounded-xl p-3 sm:p-4" data-reveal>
           <span className="text-xs font-medium text-text-muted uppercase tracking-wide mr-1">Overview</span>
@@ -366,11 +389,9 @@ export default function ProvidersPage() {
                   key={info.id}
                   providerId={info.id}
                   provider={info}
-                  stats={getProviderStats(info.id, "apikey")}
+                  stats={getProviderStats(info.id)}
                   authType="compatible"
-                  onToggle={(active) =>
-                    handleToggleProvider(info.id, "apikey", active)
-                  }
+                  onToggle={(active) => handleToggleProvider(info.id, active)}
                 />
               ),
             )}
@@ -411,9 +432,9 @@ export default function ProvidersPage() {
               key={key}
               providerId={key}
               provider={info}
-              stats={getProviderStats(key, "oauth")}
+              stats={getProviderStats(key)}
               authType="oauth"
-              onToggle={(active) => handleToggleProvider(key, "oauth", active)}
+              onToggle={(active) => handleToggleProvider(key, active)}
             />
           ))}
         </div>
@@ -450,9 +471,9 @@ export default function ProvidersPage() {
               key={key}
               providerId={key}
               provider={info}
-              stats={getProviderStats(key, "oauth")}
+              stats={getProviderStats(key)}
               authType="free"
-              onToggle={(active) => handleToggleProvider(key, "oauth", active)}
+              onToggle={(active) => handleToggleProvider(key, active)}
             />
           ))}
           {freeTierEntries.map(([key, info]) => (
@@ -460,9 +481,9 @@ export default function ProvidersPage() {
               key={key}
               providerId={key}
               provider={info}
-              stats={getProviderStats(key, "apikey")}
+              stats={getProviderStats(key)}
               authType="apikey"
-              onToggle={(active) => handleToggleProvider(key, "apikey", active)}
+              onToggle={(active) => handleToggleProvider(key, active)}
             />
           ))}
         </div>
@@ -499,9 +520,9 @@ export default function ProvidersPage() {
               key={key}
               providerId={key}
               provider={info}
-              stats={getProviderStats(key, "apikey")}
+              stats={getProviderStats(key)}
               authType="apikey"
-              onToggle={(active) => handleToggleProvider(key, "apikey", active)}
+              onToggle={(active) => handleToggleProvider(key, active)}
             />
           ))}
         </div>
@@ -519,6 +540,30 @@ export default function ProvidersPage() {
       </ProviderSection>
       )}
 
+      {utilityApikeyEntries.length > 0 && (
+      <ProviderSection
+        data-reveal
+        icon="travel_explore"
+        title="Media Providers (Search & Tools)"
+        subtitle="Web search, fetch, and utility media providers with active connections."
+        badge="Media"
+        badgeVariant="builtin"
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1800px]:grid-cols-6">
+          {utilityApikeyEntries.map(([key, info]) => (
+            <ApiKeyProviderCard
+              key={key}
+              providerId={key}
+              provider={info}
+              stats={getProviderStats(key)}
+              authType="apikey"
+              onToggle={(active) => handleToggleProvider(key, active)}
+            />
+          ))}
+        </div>
+      </ProviderSection>
+      )}
+
       {/* Web Cookie Providers — use browser subscription cookie instead of API key */}
       {/* <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -532,9 +577,9 @@ export default function ProvidersPage() {
               key={key}
               providerId={key}
               provider={info}
-              stats={getProviderStats(key, "apikey")}
+              stats={getProviderStats(key)}
               authType="apikey"
-              onToggle={(active) => handleToggleProvider(key, "apikey", active)}
+              onToggle={(active) => handleToggleProvider(key, active)}
             />
           ))}
         </div>
@@ -574,6 +619,7 @@ export default function ProvidersPage() {
 
 function ProviderCard({ providerId, provider, stats, authType, onToggle }) {
   const { connected, error, errorCode, errorTime, allDisabled } = stats;
+  const hasError = error > 0;
   const isNoAuth = !!provider.noAuth;
 
   const dotColors = {
@@ -593,12 +639,12 @@ function ProviderCard({ providerId, provider, stats, authType, onToggle }) {
     <Link href={`/dashboard/providers/${providerId}`} className="group min-w-0" data-reveal>
       <Card
         padding="sm"
-        className={`provider-glass-card h-full cursor-pointer ${allDisabled ? "opacity-50" : ""}`}
+        className={`provider-glass-card h-full cursor-pointer ${allDisabled ? "opacity-50" : ""} ${hasError ? "provider-glass-card--error" : ""}`}
       >
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div
-              className="glass-panel-subtle size-10 shrink-0 rounded-xl flex items-center justify-center"
+              className={`glass-panel-subtle size-10 shrink-0 rounded-xl flex items-center justify-center relative ${hasError ? "provider-icon--error" : ""}`}
               style={{
                 backgroundColor: `${provider.color?.length > 7 ? provider.color : provider.color + "18"}`,
               }}
@@ -613,9 +659,16 @@ function ProviderCard({ providerId, provider, stats, authType, onToggle }) {
                 }
                 fallbackColor={provider.color}
               />
+              {hasError ? (
+                <span className="provider-error-dot absolute -right-0.5 -top-0.5" aria-hidden="true">
+                  <ConnectionErrorIndicator count={error} errorCode={errorCode} size="xs" />
+                </span>
+              ) : null}
             </div>
             <div className="min-w-0" data-i18n-skip>
-              <h3 className="truncate font-semibold text-sm sm:text-base">{provider.name}</h3>
+              <h3 className="truncate font-semibold text-sm sm:text-base">
+                {provider.name}
+              </h3>
               <ProviderConnectionStatus
                 connected={connected}
                 error={error}
@@ -628,7 +681,7 @@ function ProviderCard({ providerId, provider, stats, authType, onToggle }) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {stats.total > 0 && (
+            {stats.total > 0 ? (
               <div
                 className="opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                 onClick={(e) => {
@@ -644,7 +697,7 @@ function ProviderCard({ providerId, provider, stats, authType, onToggle }) {
                   title={allDisabled ? "Enable provider" : "Disable provider"}
                 />
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </Card>
@@ -678,6 +731,7 @@ function ApiKeyProviderCard({
   onToggle,
 }) {
   const { connected, error, errorCode, errorTime, allDisabled } = stats;
+  const hasError = error > 0;
   const isCompatible = providerId.startsWith(OPENAI_COMPATIBLE_PREFIX);
   const isAnthropicCompatible = providerId.startsWith(
     ANTHROPIC_COMPATIBLE_PREFIX,
@@ -709,12 +763,12 @@ function ApiKeyProviderCard({
     <Link href={`/dashboard/providers/${providerId}`} className="group min-w-0" data-reveal>
       <Card
         padding="sm"
-        className={`provider-glass-card h-full cursor-pointer ${allDisabled ? "opacity-50" : ""}`}
+        className={`provider-glass-card h-full cursor-pointer ${allDisabled ? "opacity-50" : ""} ${hasError ? "provider-glass-card--error" : ""}`}
       >
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div
-              className="glass-panel-subtle size-10 shrink-0 rounded-xl flex items-center justify-center"
+              className={`glass-panel-subtle size-10 shrink-0 rounded-xl flex items-center justify-center relative ${hasError ? "provider-icon--error" : ""}`}
               style={{
                 backgroundColor: `${provider.color?.length > 7 ? provider.color : provider.color + "18"}`,
               }}
@@ -729,9 +783,16 @@ function ApiKeyProviderCard({
                 }
                 fallbackColor={provider.color}
               />
+              {hasError ? (
+                <span className="provider-error-dot absolute -right-0.5 -top-0.5" aria-hidden="true">
+                  <ConnectionErrorIndicator count={error} errorCode={errorCode} size="xs" />
+                </span>
+              ) : null}
             </div>
             <div className="min-w-0" data-i18n-skip>
-              <h3 className="truncate font-semibold text-sm sm:text-base">{provider.name}</h3>
+              <h3 className="truncate font-semibold text-sm sm:text-base">
+                {provider.name}
+              </h3>
               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                 <ProviderConnectionStatus
                   connected={connected}

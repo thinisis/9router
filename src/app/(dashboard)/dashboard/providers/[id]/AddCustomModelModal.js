@@ -2,20 +2,23 @@
 
 import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
-import { Button, Modal } from "@/shared/components";
+import { Button, Modal, Input } from "@/shared/components";
+import { translate, translateFormat } from "@/i18n/runtime";
 
 export default function AddCustomModelModal({ isOpen, providerAlias, providerDisplayAlias, onSave, onClose }) {
   const [modelId, setModelId] = useState("");
-  const [testStatus, setTestStatus] = useState(null); // null | "testing" | "ok" | "error"
+  const [testStatus, setTestStatus] = useState(null);
   const [testError, setTestError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Reset state when modal opens
   useEffect(() => {
-    if (isOpen) { setModelId(""); setTestStatus(null); setTestError(""); }
+    if (isOpen) {
+      setModelId("");
+      setTestStatus(null);
+      setTestError("");
+    }
   }, [isOpen]);
 
-  // Strip provider's own alias prefix (e.g. "cc/model" -> "model" for cc provider)
   const stripAlias = (id) => {
     const prefix = `${providerAlias}/`;
     return id.startsWith(prefix) ? id.slice(prefix.length) : id;
@@ -56,59 +59,69 @@ export default function AddCustomModelModal({ isOpen, providerAlias, providerDis
     if (e.key === "Enter") handleTest();
   };
 
+  const cleanDisplayId = stripAlias(modelId.trim()) || "model-id";
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add Custom Model">
+    <Modal isOpen={isOpen} onClose={onClose} title={translate("Add Custom Model")}>
       <div className="flex flex-col gap-4">
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">Model ID</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={modelId}
-              onChange={(e) => { setModelId(e.target.value); setTestStatus(null); setTestError(""); }}
-              onKeyDown={handleKeyDown}
-              placeholder="e.g. claude-opus-4-5"
-              className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:border-primary"
-              autoFocus
-            />
-            <Button
-              variant="secondary"
-              icon="science"
-              loading={testStatus === "testing"}
-              onClick={handleTest}
-              disabled={!modelId.trim() || testStatus === "testing"}
-            >
-              {testStatus === "testing" ? "Testing..." : "Test"}
-            </Button>
-          </div>
-          <p className="text-xs text-text-muted mt-1">
-            Sent to provider as: <code className="font-mono bg-sidebar px-1 rounded">{stripAlias(modelId.trim()) || "model-id"}</code>
-          </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <Input
+            label={translate("Model ID")}
+            value={modelId}
+            onChange={(e) => {
+              setModelId(e.target.value);
+              setTestStatus(null);
+              setTestError("");
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={translate("e.g. claude-opus-4-5")}
+            autoFocus
+            className="flex-1"
+          />
+          <Button
+            variant="secondary"
+            icon="science"
+            loading={testStatus === "testing"}
+            onClick={handleTest}
+            disabled={!modelId.trim() || testStatus === "testing"}
+            className="w-full sm:w-auto shrink-0"
+          >
+            {testStatus === "testing" ? translate("Testing...") : translate("Test")}
+          </Button>
         </div>
 
-        {/* Test result */}
+        <p className="text-xs text-text-muted">
+          {translate("Sent to provider as:")}{" "}
+          <code className="font-mono rounded-md border border-border-subtle bg-surface-2 px-1.5 py-0.5 text-text-main">
+            {cleanDisplayId}
+          </code>
+        </p>
+
         {testStatus === "ok" && (
-          <div className="flex items-center gap-2 text-sm text-green-600">
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
             <span className="material-symbols-outlined text-base">check_circle</span>
-            Model is reachable
+            {translate("Model is reachable")}
           </div>
         )}
         {testStatus === "error" && (
-          <div className="flex items-start gap-2 text-sm text-red-500">
-            <span className="material-symbols-outlined text-base shrink-0">cancel</span>
-            <span>{testError || "Model not reachable"}</span>
+          <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+            <span className="material-symbols-outlined shrink-0 text-base">cancel</span>
+            <span>{testError || translate("Model not reachable")}</span>
           </div>
         )}
 
-        <div className="flex gap-2 pt-1">
-          <Button onClick={onClose} variant="ghost" fullWidth size="sm">Cancel</Button>
+        <div className="flex gap-2 border-t border-border-subtle pt-4">
+          <Button onClick={onClose} variant="ghost" fullWidth size="sm">
+            {translate("Cancel")}
+          </Button>
           <Button
             onClick={handleSave}
             fullWidth
             size="sm"
+            icon="add"
             disabled={!modelId.trim() || saving}
           >
-            {saving ? "Adding..." : "Add Model"}
+            {saving ? translate("Adding...") : translate("Add Model")}
           </Button>
         </div>
       </div>

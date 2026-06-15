@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/shared/utils/cn";
+import { translateFormat } from "@/i18n/runtime";
 import { formatResetTime, getRemainingPercentage } from "./utils";
 
 const PAGE_SIZE = 10;
@@ -225,11 +226,18 @@ export default function QuotaTable({
       {totalPages > 1 && (
         <div className="rounded-md border border-black/10 bg-black/[0.02] px-2 py-1.5 dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between gap-2 text-[10px] text-text-muted">
-            <span>
-              Showing {pageStart}-{pageEnd} of {sortedQuotas.length}
+            <span data-i18n-skip>
+              {translateFormat("Showing {start}-{end} of {total}", {
+                start: pageStart,
+                end: pageEnd,
+                total: sortedQuotas.length,
+              })}
             </span>
-            <span>
-              Page {page} / {totalPages}
+            <span data-i18n-skip>
+              {translateFormat("Page {current} / {total}", {
+                current: page,
+                total: totalPages,
+              })}
             </span>
           </div>
           <div className="mt-1.5 flex items-center justify-end gap-1">

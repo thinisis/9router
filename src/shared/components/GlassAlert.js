@@ -23,14 +23,24 @@ export default function GlassAlert({ variant = "warning", message, action, class
   const status = STATUS_MAP[variant] || "warning";
 
   return (
-    <Alert status={status} className={cn("items-start", className)} role="alert">
+    <Alert
+      status={status}
+      className={cn(
+        "glass-alert-bar",
+        hideIcon ? "glass-alert-bar--no-icon items-center" : "items-center",
+        className,
+      )}
+      role="alert"
+    >
       {!hideIcon && (
-        <Alert.Indicator>
+        <Alert.Indicator className="glass-alert-bar__indicator">
           <span className="material-symbols-outlined text-[18px]">{ICONS[variant]}</span>
         </Alert.Indicator>
       )}
-      <Alert.Content>
-        <Alert.Description className="text-sm leading-relaxed">{message}</Alert.Description>
+      <Alert.Content className="glass-alert-bar__content min-w-0 flex-1">
+        <Alert.Description className="text-sm leading-snug">
+          {message}
+        </Alert.Description>
       </Alert.Content>
       {action && (
         action.href ? (
@@ -61,7 +71,7 @@ export default function GlassAlert({ variant = "warning", message, action, class
 
 GlassAlert.propTypes = {
   variant: PropTypes.oneOf(["warning", "error", "success", "info"]),
-  message: PropTypes.string.isRequired,
+  message: PropTypes.oneOfType([PropTypes.string, PropTypes.node]).isRequired,
   action: PropTypes.shape({
     label: PropTypes.string,
     href: PropTypes.string,

@@ -2,8 +2,41 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Card, Button, CardSkeleton, GlassAlert } from "@/shared/components";
+import { Card, Button, CardSkeleton, GlassAlert, ConnectionErrorIndicator } from "@/shared/components";
 import { cn } from "@/shared/utils/cn";
+import { translate, translateFormat } from "@/i18n/runtime";
+import {
+  AI_PROVIDERS,
+  OAUTH_PROVIDERS,
+  APIKEY_PROVIDERS,
+  FREE_PROVIDERS,
+} from "@/shared/constants/config";
+import { FREE_TIER_PROVIDERS } from "@/shared/constants/providers";
+import {
+  classifyProvider,
+  getProvidersWithErrors,
+  groupProvidersWithErrorsByCategory,
+} from "@/shared/utils/providerConnectionStats";
+
+function resolveProviderMeta(providerId) {
+  const info =
+    OAUTH_PROVIDERS[providerId] ||
+    APIKEY_PROVIDERS[providerId] ||
+    FREE_PROVIDERS[providerId] ||
+    FREE_TIER_PROVIDERS[providerId] ||
+    AI_PROVIDERS[providerId];
+  return { name: info?.name || providerId, ...classifyProvider(providerId) };
+}
+
+function connectionErrorsAriaLabel(categoryLabel, count) {
+  if (count === 1) {
+    return translateFormat("{category} — 1 connection error", { category: categoryLabel });
+  }
+  return translateFormat("{category} — {count} connection errors", {
+    category: categoryLabel,
+    count,
+  });
+}
 
 function StatusCard({ href, icon, label, value, sub, variant = "default" }) {
   const valueColors = {
@@ -80,9 +113,10 @@ export default function OverviewPageClient() {
 
         const connections = prov.connections || [];
         const active = connections.filter((c) => c.isActive !== false);
-        const errors = active.filter(
-          (c) => c.testStatus === "error" || c.testStatus === "expired" || c.lastError
-        ).length;
+        const erroredProviders = getProvidersWithErrors(connections, resolveProviderMeta);
+        const { ai: aiErrors, media: mediaErrors } =
+          groupProvidersWithErrorsByCategory(erroredProviders);
+        const errors = erroredProviders.length;
 
         const next = {
           providers: { total: connections.length, active: active.length, errors },
@@ -99,20 +133,52 @@ export default function OverviewPageClient() {
 
         const list = [];
         if (active.length === 0) {
-          list.push({ message: "No active providers connected.", href: "/dashboard/providers", label: "Add provider" });
-        }
-        if (errors > 0) {
           list.push({
-            message: `${errors} provider connection(s) have errors.`,
+            kind: "default",
+            message: translate("No active providers connected."),
             href: "/dashboard/providers",
-            label: "Review",
+            label: translate("Add provider"),
+          });
+        }
+        if (aiErrors.length > 0) {
+          list.push({
+            kind: "connection",
+            categoryIcon: "psychology",
+            categoryLabel: translate("AI Provider"),
+            count: aiErrors.length,
+            href: "/dashboard/providers",
+            label: translate("Review AI Providers"),
+          });
+        }
+        if (mediaErrors.length > 0) {
+          const mediaHref =
+            mediaErrors.length === 1 && mediaErrors[0].href
+              ? mediaErrors[0].href
+              : "/dashboard/media-providers/web";
+          list.push({
+            kind: "connection",
+            categoryIcon: "perm_media",
+            categoryLabel: translate("Media Provider"),
+            count: mediaErrors.length,
+            href: mediaHref,
+            label: translate("Review Media Providers"),
           });
         }
         if (next.keys === 0) {
-          list.push({ message: "No API keys created yet.", href: "/dashboard/endpoint", label: "Create key" });
+          list.push({
+            kind: "default",
+            message: translate("No API keys created yet."),
+            href: "/dashboard/endpoint",
+            label: translate("Create key"),
+          });
         }
         if (next.tunnel.enabled && !next.tunnel.reachable) {
-          list.push({ message: "Tunnel is enabled but not reachable.", href: "/dashboard/endpoint", label: "Check tunnel" });
+          list.push({
+            kind: "default",
+            message: translate("Tunnel is enabled but not reachable."),
+            href: "/dashboard/endpoint",
+            label: translate("Check tunnel"),
+          });
         }
         setIssues(list);
       } catch {
@@ -155,15 +221,40 @@ export default function OverviewPageClient() {
 
       {issues.length > 0 && (
         <div className="flex flex-col gap-2" data-reveal>
-          {issues.map((issue) => (
-            <GlassAlert
-              key={issue.message}
-              variant="warning"
-              hideIcon
-              message={issue.message}
-              action={{ label: issue.label, href: issue.href }}
-            />
-          ))}
+          {issues.map((issue) =>
+            issue.kind === "connection" ? (
+              <div
+                key={`${issue.categoryLabel}-${issue.count}`}
+                className="overview-connection-issue"
+                role="status"
+                aria-label={connectionErrorsAriaLabel(issue.categoryLabel, issue.count)}
+                data-i18n-skip
+              >
+                <ConnectionErrorIndicator count={issue.count} size="sm" />
+                <span
+                  className="overview-connection-issue__category"
+                  title={issue.categoryLabel}
+                  aria-hidden="true"
+                >
+                  <span className="material-symbols-outlined text-[16px]">{issue.categoryIcon}</span>
+                </span>
+                <Link
+                  href={issue.href}
+                  className="overview-connection-issue__action"
+                >
+                  {issue.label}
+                </Link>
+              </div>
+            ) : (
+              <GlassAlert
+                key={issue.message}
+                variant="warning"
+                hideIcon
+                message={issue.message}
+                action={{ label: issue.label, href: issue.href }}
+              />
+            ),
+          )}
         </div>
       )}
 
@@ -174,9 +265,20 @@ export default function OverviewPageClient() {
           label="Providers"
           value={data.providers.active}
           sub={
-            data.providers.errors > 0
-              ? `${data.providers.errors} with errors`
-              : `${data.providers.total} total connections`
+            data.providers.errors > 0 ? (
+              <span
+                className="inline-flex items-center gap-1.5"
+                title={translateFormat("{count} providers with errors", {
+                  count: data.providers.errors,
+                })}
+                data-i18n-skip
+              >
+                <ConnectionErrorIndicator count={data.providers.errors} size="xs" />
+                <span className="tabular-nums">{data.providers.errors}</span>
+              </span>
+            ) : (
+              translateFormat("{count} total connections", { count: data.providers.total })
+            )
           }
           variant={data.providers.errors > 0 ? "warning" : data.providers.active > 0 ? "success" : "default"}
         />
@@ -262,7 +364,7 @@ export default function OverviewPageClient() {
                 data.health ? "bg-success" : "bg-danger"
               )}
             />
-            API health: {data.health ? "OK" : "Unreachable"}
+            {translate("API health:")} {data.health ? "OK" : translate("Unreachable")}
           </div>
         </Card>
       </div>
