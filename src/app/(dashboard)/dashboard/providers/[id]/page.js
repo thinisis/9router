@@ -14,6 +14,7 @@ import { fetchSuggestedModels } from "@/shared/utils/providerModelsFetcher";
 import PassthroughModelsSection from "./PassthroughModelsSection";
 import ModelsManagerPanel from "../components/ModelsManagerPanel";
 import { useNotificationStore } from "@/store/notificationStore";
+import { StatusMetricChip } from "@/shared/components";
 import ConnectionRow from "./ConnectionRow";
 import AddApiKeyModal from "./AddApiKeyModal";
 import EditCompatibleNodeModal from "./EditCompatibleNodeModal";
@@ -1214,17 +1215,26 @@ export default function ProviderDetailPage() {
           ) : (
             <>
               {oneByOneSummary && (
-                <div className="mb-4 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 text-xs text-text-muted dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span>Total: {oneByOneSummary.total}</span>
-                    <span>Completed: {oneByOneSummary.completed}</span>
-                    <span>Passed: {oneByOneSummary.passed}</span>
-                    <span>Failed: {oneByOneSummary.failed}</span>
+                <div className="mb-4 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusMetricChip icon="layers" label="Total" value={oneByOneSummary.total} variant="muted" hideWhenZero={false} />
+                    <StatusMetricChip icon="task_alt" label="Done" value={oneByOneSummary.completed} variant="info" hideWhenZero={false} />
+                    <StatusMetricChip icon="check_circle" label="Passed" value={oneByOneSummary.passed} variant="success" />
+                    <StatusMetricChip icon="cancel" label="Failed" value={oneByOneSummary.failed} variant="danger" />
                     {oneByOneSummary.stopped && (
-                      <span className="text-amber-600 dark:text-amber-400">Stopped</span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300" data-i18n-skip>
+                        <span className="material-symbols-outlined text-[14px]">pause_circle</span>
+                        <span>Stopped</span>
+                      </span>
                     )}
                     {oneByOneRunning && oneByOneCurrentConnectionId && (
-                      <span>Running: {connections.find((conn) => conn.id === oneByOneCurrentConnectionId)?.name || oneByOneCurrentConnectionId}</span>
+                      <StatusMetricChip
+                        icon="progress_activity"
+                        label="Running"
+                        value={connections.find((conn) => conn.id === oneByOneCurrentConnectionId)?.name || "…"}
+                        variant="info"
+                        hideWhenZero={false}
+                      />
                     )}
                   </div>
                 </div>

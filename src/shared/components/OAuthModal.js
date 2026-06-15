@@ -223,9 +223,13 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         redirectUri = `http://localhost:${appPort}/callback`;
       }
 
-      // Build authorize URL first to get codeVerifier/state for codex server-side mode
+      // Build authorize URL first to get codeVerifier/state for codex server-side mode.
+      // Do not pass redirect_uri for fixed-port providers — server uses defaults and
+      // Cloudflare WAF blocks 127.0.0.1 in query strings.
       const authorizeUrl = new URL(`/api/oauth/${provider}/authorize`, window.location.origin);
-      authorizeUrl.searchParams.set("redirect_uri", redirectUri);
+      if (provider !== "codex" && provider !== "xai") {
+        authorizeUrl.searchParams.set("redirect_uri", redirectUri);
+      }
       if (oauthMeta) {
         Object.entries(oauthMeta).forEach(([k, v]) => { if (v) authorizeUrl.searchParams.set(k, v); });
       }
@@ -242,7 +246,6 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
           proxyUrl.searchParams.set("app_port", appPort);
           proxyUrl.searchParams.set("state", data.state);
           proxyUrl.searchParams.set("code_verifier", data.codeVerifier);
-          proxyUrl.searchParams.set("redirect_uri", redirectUri);
           const proxyRes = await fetch(proxyUrl.toString());
           const proxyData = await proxyRes.json();
           codexProxyActive = proxyData.success;
@@ -261,7 +264,6 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
           proxyUrl.searchParams.set("app_port", appPort);
           proxyUrl.searchParams.set("state", data.state);
           proxyUrl.searchParams.set("code_verifier", data.codeVerifier);
-          proxyUrl.searchParams.set("redirect_uri", redirectUri);
           const proxyRes = await fetch(proxyUrl.toString());
           const proxyData = await proxyRes.json();
           xaiProxyActive = proxyData.success;
@@ -275,7 +277,12 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         }
       }
 
-      setAuthData({ ...data, redirectUri, codexServerSide, xaiServerSide });
+      setAuthData({
+        ...data,
+        redirectUri: data.redirectUri || redirectUri,
+        codexServerSide,
+        xaiServerSide,
+      });
 
       if (provider === "codex" && codexProxyActive) {
         // Proxy active: callback will be handled server-side (auto-exchange) or via channels (fallback)

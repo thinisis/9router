@@ -129,7 +129,7 @@ function ConnectionRow({ connection, proxyPools, isOAuth, isFirst, isLast, onMov
             {hasAnyProxy && <Badge variant={proxyBadgeVariant} size="sm">Proxy</Badge>}
             {isCooldown && connection.isActive !== false && <CooldownTimer until={modelLockUntil} />}
             {connection.lastError && connection.isActive !== false && (
-              <span className="text-xs text-red-500 truncate max-w-[300px]" title={connection.lastError}>{connection.lastError}</span>
+              <InlineFeedback variant="error" message={connection.lastError} size="sm" />
             )}
             <span className="text-xs text-text-muted">#{connection.priority}</span>
           </div>

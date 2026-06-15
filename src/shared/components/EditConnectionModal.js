@@ -6,6 +6,7 @@ import Modal from "@/shared/components/Modal";
 import Input from "@/shared/components/Input";
 import Button from "@/shared/components/Button";
 import Badge from "@/shared/components/Badge";
+import InlineFeedback from "@/shared/components/InlineFeedback";
 import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "@/shared/constants/providers";
 
 export default function EditConnectionModal({ isOpen, connection, proxyPools, onSave, onClose }) {
@@ -248,10 +249,11 @@ export default function EditConnectionModal({ isOpen, connection, proxyPools, on
             <Button onClick={handleTest} variant="secondary" disabled={testing}>
               {testing ? "Testing..." : "Test Connection"}
             </Button>
-            {testResult && (
-              <Badge variant={testResult === "success" ? "success" : "error"}>
-                {testResult === "success" ? "Valid" : "Failed"}
-              </Badge>
+            {testResult === "success" && (
+              <InlineFeedback variant="success" message="Connection valid" size="sm" />
+            )}
+            {testResult === "error" && (
+              <InlineFeedback variant="error" message="Connection failed" size="sm" />
             )}
           </div>
         )}

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import PropTypes from "prop-types";
-import { Button, Input, SegmentedControl } from "@/shared/components";
+import { Button, Input, SegmentedControl, StatusMetricChip, InlineFeedback } from "@/shared/components";
 import { cn } from "@/shared/utils/cn";
 import { translate } from "@/i18n/runtime";
 import ModelRow from "../[id]/ModelRow";
@@ -263,23 +263,28 @@ export default function ModelsManagerPanel({
 
       <div className="models-manager-stats flex flex-wrap gap-2">
         {[
-          { label: "Total", value: stats.total, icon: "layers" },
-          { label: "Active", value: stats.active, icon: "check_circle" },
-          { label: "Custom", value: stats.custom, icon: "tune" },
-          { label: "Disabled", value: stats.disabled, icon: "pause_circle" },
-          { label: "Passed", value: stats.passed, icon: "science" },
-          { label: "Failed", value: stats.failed, icon: "error" },
+          { label: "Total", value: stats.total, icon: "layers", variant: "muted", hideWhenZero: false },
+          { label: "Active", value: stats.active, icon: "check_circle", variant: "success" },
+          { label: "Custom", value: stats.custom, icon: "tune", variant: "info" },
+          { label: "Disabled", value: stats.disabled, icon: "pause_circle", variant: "warning" },
+          { label: "Passed", value: stats.passed, icon: "science", variant: "success" },
+          { label: "Failed", value: stats.failed, icon: "cancel", variant: "danger" },
         ].map((s) => (
-          <div key={s.label} className="models-stat-chip glass-panel-subtle">
-            <span className="material-symbols-outlined text-[16px] text-primary">{s.icon}</span>
-            <span className="text-xs text-text-muted">{s.label}</span>
-            <span className="text-sm font-semibold tabular-nums">{s.value}</span>
-          </div>
+          <StatusMetricChip
+            key={s.label}
+            icon={s.icon}
+            label={s.label}
+            value={s.value}
+            variant={s.variant}
+            hideWhenZero={s.hideWhenZero}
+          />
         ))}
       </div>
 
       {!!modelsTestError && (
-        <p className="text-xs text-red-500 break-words px-1">{modelsTestError}</p>
+        <div className="px-1">
+          <InlineFeedback variant="error" message={modelsTestError} />
+        </div>
       )}
 
       <div

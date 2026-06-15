@@ -16,6 +16,8 @@ export { default as Header } from "./Header";
 export { default as Footer } from "./Footer";
 export { default as CreditsNotice } from "./CreditsNotice";
 export { default as GlassAlert } from "./GlassAlert";
+export { default as StatusMetricChip } from "./StatusMetricChip";
+export { default as InlineFeedback } from "./InlineFeedback";
 export { default as GlassToastContainer } from "./GlassToastContainer";
 export { default as ProviderSection } from "./ProviderSection";
 export { default as EmptyState } from "./EmptyState";

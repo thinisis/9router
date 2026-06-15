@@ -55,11 +55,18 @@ export default function OverviewPageClient() {
   useEffect(() => {
     async function load() {
       try {
+        const isRemoteDashboard =
+          typeof window !== "undefined" &&
+          window.location.hostname !== "localhost" &&
+          window.location.hostname !== "127.0.0.1";
+
         const [provRes, keysRes, tunnelRes, mitmRes, statsRes, healthRes] = await Promise.all([
           fetch("/api/providers"),
           fetch("/api/keys"),
           fetch("/api/tunnel/status"),
-          fetch("/api/cli-tools/antigravity-mitm"),
+          isRemoteDashboard
+            ? Promise.resolve({ ok: false, status: 403 })
+            : fetch("/api/cli-tools/antigravity-mitm"),
           fetch("/api/usage/stats?period=today"),
           fetch("/api/health"),
         ]);

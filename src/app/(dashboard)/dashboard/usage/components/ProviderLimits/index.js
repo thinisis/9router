@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ProviderIcon from "@/shared/components/ProviderIcon";
+import InlineFeedback from "@/shared/components/InlineFeedback";
 import QuotaTable from "./QuotaTable";
 import Toggle from "@/shared/components/Toggle";
 import { parseQuotaData, calculatePercentage } from "./utils";
@@ -374,7 +375,7 @@ export default function ProviderLimits() {
       );
       setErrors((prev) => ({
         ...prev,
-        [connectionId]: error.message || "Failed to fetch quota",
+        [connectionId]: error.message || "Không thể tải hạn mức",
       }));
     } finally {
       setLoading((prev) => ({ ...prev, [connectionId]: false }));
@@ -1081,11 +1082,8 @@ export default function ProviderLimits() {
                     </span>
                   </div>
                 ) : error ? (
-                  <div className="text-center py-5">
-                    <span className="material-symbols-outlined text-[28px] text-red-500">
-                      error
-                    </span>
-                    <p className="mt-1.5 text-xs text-text-muted">{error}</p>
+                  <div className="flex items-center justify-center py-5">
+                    <InlineFeedback variant="error" message={error} size="lg" />
                   </div>
                 ) : quota?.message ? (
                   <div className="text-center py-5">
