@@ -46,6 +46,7 @@ export default function ModelsManagerPanel({
   onImportQoderModels,
   importingQoderModels,
   isAnthropicCompatible,
+  getCaps,
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -209,6 +210,7 @@ export default function ModelsManagerPanel({
         isDisabled={isDisabled}
         onDisable={!isCustom && !isDisabled ? () => onDisableModel(id) : undefined}
         onEnable={isDisabled ? () => onEnableModel(id) : undefined}
+        caps={getCaps ? getCaps(`${providerId}/${id}`) : undefined}
       />
     );
   };
@@ -379,4 +381,5 @@ ModelsManagerPanel.propTypes = {
   onImportQoderModels: PropTypes.func,
   importingQoderModels: PropTypes.bool,
   isAnthropicCompatible: PropTypes.bool,
+  getCaps: PropTypes.func,
 };

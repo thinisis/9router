@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getDefaultPricing } from "@/shared/constants/pricing.js";
+import { getDefaultPricing } from "open-sse/providers/pricing.js";
 import Modal from "./Modal";
 import Button from "./Button";
 import Input from "./Input";

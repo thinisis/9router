@@ -56,6 +56,7 @@ export { default as ProviderInfoCard } from "./ProviderInfoCard";
 export { default as ProviderConnectionStatus } from "./ProviderConnectionStatus";
 export { default as ConnectionErrorIndicator } from "./ConnectionErrorIndicator";
 export { default as BackupSectionsModal } from "./BackupSectionsModal";
+export { default as CapacityBadges } from "./CapacityBadges";
 
 // Layouts
 export * from "./layouts";

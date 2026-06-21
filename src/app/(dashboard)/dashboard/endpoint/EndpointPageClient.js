@@ -2,68 +2,27 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
-import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal, GlassAlert, SegmentedControl, EmptyState } from "@/shared/components";
+import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { getCurrentLocale, onLocaleChange } from "@/i18n/runtime";
 import { DEFAULT_LOCALE } from "@/i18n/config";
-
-// Locales that unlock wenyan (classical Chinese) caveman levels
-const WENYAN_LOCALES = ["zh-CN", "zh-TW"];
-
-const TUNNEL_BENEFITS = [
-  { icon: "public", title: "Access Anywhere", desc: "Use your API from any network" },
-  { icon: "group", title: "Share Endpoint", desc: "Share URL with team members" },
-  { icon: "code", title: "Use in Cursor/Cline", desc: "Connect AI tools remotely" },
-  { icon: "lock", title: "Encrypted", desc: "End-to-end TLS via Cloudflare" },
-];
-
-const TUNNEL_PING_INTERVAL_MS = 2000;
-const TUNNEL_PING_MAX_MS = 300000;
-const STATUS_POLL_FAST_MS = 5000;
-const STATUS_POLL_SLOW_MS = 30000;
-const REACHABLE_MISS_THRESHOLD = 5;
-const CLIENT_PING_FAST_MS = 10000;
-const CLIENT_PING_SLOW_MS = 60000;
-const CLIENT_PING_TIMEOUT_MS = 5000;
-
-// Browser-side health probe: must reach origin (not just CF/TS edge).
-// cors mode → res.ok=false for 5xx (e.g. Cloudflare 530 when origin dead).
-// /api/health route sets Access-Control-Allow-Origin: * → CORS works through tunnel.
-async function clientPingUrl(url) {
-  if (!url) return false;
-  try {
-    const res = await fetch(`${url}/api/health`, {
-      mode: "cors",
-      cache: "no-store",
-      signal: AbortSignal.timeout(CLIENT_PING_TIMEOUT_MS),
-    });
-    return res.ok;
-  } catch { return false; }
-}
-
-// Race multiple URLs: resolve true as soon as any one passes ping.
-async function clientPingAny(...urls) {
-  const checks = urls.filter(Boolean).map(clientPingUrl);
-  if (!checks.length) return false;
-  return new Promise((resolve) => {
-    let pending = checks.length;
-    checks.forEach((p) => p.then((ok) => {
-      if (ok) resolve(true);
-      else if (--pending === 0) resolve(false);
-    }));
-  });
-}
-
-const CAVEMAN_LEVELS = [
-  { id: "lite", label: "Lite", desc: "Drop filler, keep grammar" },
-  { id: "full", label: "Full", desc: "Drop articles, fragments OK" },
-  { id: "ultra", label: "Ultra", desc: "Telegraphic, max compression" },
-  { id: "wenyan-lite", label: "文 Lite", desc: "Classical Chinese, light compression", wenyan: true },
-  { id: "wenyan", label: "文 Full", desc: "Maximum 文言文, 80-90% reduction", wenyan: true },
-  { id: "wenyan-ultra", label: "文 Ultra", desc: "Extreme classical compression", wenyan: true },
-];
+import {
+  WENYAN_LOCALES,
+  TUNNEL_BENEFITS,
+  TUNNEL_PING_INTERVAL_MS,
+  TUNNEL_PING_MAX_MS,
+  STATUS_POLL_FAST_MS,
+  REACHABLE_MISS_THRESHOLD,
+  CLIENT_PING_FAST_MS,
+  CAVEMAN_LEVELS,
+  PONYTAIL_LEVELS,
+} from "./endpointConstants";
+import { clientPingUrl, clientPingAny } from "./endpointPing";
+import EndpointRow from "./components/EndpointRow";
+import StatusAlert from "./components/StatusAlert";
+import Tooltip from "./components/Tooltip";
+import SecurityWarning from "./components/SecurityWarning";
 export default function APIPageClient({ machineId }) {
-  const [endpointTab, setEndpointTab] = useState("endpoint");
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -76,8 +35,17 @@ export default function APIPageClient({ machineId }) {
   const [hasPassword, setHasPassword] = useState(true);
   const [tunnelDashboardAccess, setTunnelDashboardAccess] = useState(false);
   const [rtkEnabled, setRtkEnabledState] = useState(true);
+  const [headroomEnabled, setHeadroomEnabled] = useState(false);
+  const [headroomUrl, setHeadroomUrl] = useState("http://localhost:8787");
+  const [headroomCompressUserMessages, setHeadroomCompressUserMessages] = useState(false);
+  const [headroomStatus, setHeadroomStatus] = useState({ installed: false, running: false, python: null, loading: true });
+  const [showHeadroomInstallModal, setShowHeadroomInstallModal] = useState(false);
+  const [headroomActionLoading, setHeadroomActionLoading] = useState(false);
+  const [headroomActionError, setHeadroomActionError] = useState("");
   const [cavemanEnabled, setCavemanEnabled] = useState(false);
   const [cavemanLevel, setCavemanLevel] = useState("full");
+  const [ponytailEnabled, setPonytailEnabled] = useState(false);
+  const [ponytailLevel, setPonytailLevel] = useState("full");
   const [locale, setLocale] = useState(DEFAULT_LOCALE);
 
   // Cloudflare Tunnel state
@@ -275,8 +243,14 @@ export default function APIPageClient({ machineId }) {
         setHasPassword(data.hasPassword || false);
         setTunnelDashboardAccess(data.tunnelDashboardAccess || false);
         setRtkEnabledState(data.rtkEnabled !== false);
+        setHeadroomEnabled(!!data.headroomEnabled);
+        setHeadroomUrl(data.headroomUrl || "http://localhost:8787");
+        setHeadroomCompressUserMessages(!!data.headroomCompressUserMessages);
+        refreshHeadroomStatus();
         setCavemanEnabled(!!data.cavemanEnabled);
         setCavemanLevel(data.cavemanLevel || "full");
+        setPonytailEnabled(!!data.ponytailEnabled);
+        setPonytailLevel(data.ponytailLevel || "full");
       }
       if (statusRes.ok) {
         const data = await statusRes.json();
@@ -356,9 +330,74 @@ export default function APIPageClient({ machineId }) {
     patchSetting({ cavemanEnabled: value });
   };
 
+  const handleHeadroomEnabled = (value) => {
+    const nextUrl = headroomUrl.trim() || "http://localhost:8787";
+    setHeadroomUrl(nextUrl);
+    setHeadroomEnabled(value);
+    patchSetting({ headroomEnabled: value, headroomUrl: nextUrl });
+  };
+
+  const handleHeadroomUrlBlur = async () => {
+    const next = headroomUrl.trim() || "http://localhost:8787";
+    setHeadroomUrl(next);
+    await patchSetting({ headroomUrl: next });
+    refreshHeadroomStatus();
+  };
+
+  const handleHeadroomCompressUserMessages = (value) => {
+    setHeadroomCompressUserMessages(value);
+    patchSetting({ headroomCompressUserMessages: value });
+  };
+
+  const refreshHeadroomStatus = useCallback(async () => {
+    setHeadroomStatus((s) => ({ ...s, loading: true }));
+    try {
+      const res = await fetch("/api/headroom/status", { headers: { "Cache-Control": "no-store" } });
+      const data = await res.json();
+      setHeadroomStatus({ ...data, loading: false });
+    } catch {
+      setHeadroomStatus({ installed: false, running: false, python: null, loading: false });
+    }
+  }, []);
+
+  const handleHeadroomStart = useCallback(async () => {
+    setHeadroomActionError("");
+    setHeadroomActionLoading(true);
+    try {
+      const res = await fetch("/api/headroom/start", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to start proxy");
+      await refreshHeadroomStatus();
+    } catch (e) {
+      setHeadroomActionError(e.message);
+    } finally {
+      setHeadroomActionLoading(false);
+    }
+  }, [refreshHeadroomStatus]);
+
+  const handleHeadroomStop = useCallback(async () => {
+    setHeadroomActionLoading(true);
+    try {
+      await fetch("/api/headroom/stop", { method: "POST" });
+      await refreshHeadroomStatus();
+    } finally {
+      setHeadroomActionLoading(false);
+    }
+  }, [refreshHeadroomStatus]);
+
   const handleCavemanLevel = (level) => {
     setCavemanLevel(level);
     patchSetting({ cavemanLevel: level });
+  };
+
+  const handlePonytailEnabled = (value) => {
+    setPonytailEnabled(value);
+    patchSetting({ ponytailEnabled: value });
+  };
+
+  const handlePonytailLevel = (level) => {
+    setPonytailLevel(level);
+    patchSetting({ ponytailLevel: level });
   };
 
   const fetchData = async () => {
@@ -776,8 +815,8 @@ export default function APIPageClient({ machineId }) {
   };
 
   const maskKey = (fullKey) => {
-    if (!fullKey) return "";
-    return fullKey.length > 8 ? fullKey.slice(0, 8) + "..." : fullKey;
+    if (!fullKey || fullKey.length <= 10) return fullKey || "";
+    return fullKey.slice(0, 6) + "•".repeat(fullKey.length - 10) + fullKey.slice(-4);
   };
 
   const toggleKeyVisibility = (keyId) => {
@@ -808,21 +847,23 @@ export default function APIPageClient({ machineId }) {
   }
 
   const currentEndpoint = baseUrl;
+  const headroomRunning = !!headroomStatus.running;
+  const headroomLocalUrl = headroomStatus.localUrl !== false;
+  const headroomCanStart = !!headroomStatus.canStart;
+  const headroomManaged = headroomLocalUrl && !!headroomStatus.managedPid;
+  const headroomStatusLabel = headroomStatus.loading
+    ? "Checking…"
+    : headroomRunning
+      ? "Running"
+      : headroomLocalUrl && !headroomStatus.installed
+        ? "Not installed"
+        : headroomLocalUrl
+          ? "Proxy off"
+          : "Unreachable";
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6 xl:gap-8">
-      <SegmentedControl
-        options={[
-          { value: "endpoint", label: "Endpoint", icon: "api" },
-          { value: "keys", label: "API Keys", icon: "vpn_key" },
-          { value: "advanced", label: "Advanced", icon: "tune" },
-        ]}
-        value={endpointTab}
-        onChange={setEndpointTab}
-        className="w-full sm:w-auto"
-      />
-
-      {endpointTab === "endpoint" && (
+    <div className="flex flex-col gap-8">
+      {/* Endpoint Card */}
       <Card>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <span className="material-symbols-outlined text-primary">api</span>
@@ -1020,11 +1061,10 @@ export default function APIPageClient({ machineId }) {
         {/* Pre-enable security gate banner */}
         {isLoginUnsafe && !tunnelEnabled && !tsEnabled && (
           <div className="mt-4">
-            <GlassAlert
-                hideIcon
-                message={unsafeReason}
-                action={{ label: "Open settings", href: "/dashboard/profile" }}
-              />
+            <SecurityWarning
+              message={unsafeReason}
+              action={{ label: "Open settings", href: "/dashboard/profile" }}
+            />
           </div>
         )}
 
@@ -1032,15 +1072,13 @@ export default function APIPageClient({ machineId }) {
         {(tunnelEnabled || tsEnabled) && (
           <div className="mt-4 flex flex-col gap-2">
             {!requireApiKey && (
-              <GlassAlert
-                hideIcon
+              <SecurityWarning
                 message="Require API key is disabled — your endpoint is publicly accessible without authentication."
-                action={{ label: "Enable", onClick: () => setEndpointTab("keys") }}
+                action={{ label: "Enable", href: "#require-api-key" }}
               />
             )}
             {(!requireLogin || !hasPassword) && (
-              <GlassAlert
-                hideIcon
+              <SecurityWarning
                 message={
                   !requireLogin
                     ? "Require login is disabled — anyone can access your dashboard via tunnel."
@@ -1069,89 +1107,8 @@ export default function APIPageClient({ machineId }) {
           </div>
         )}
       </Card>
-      )}
 
-      {endpointTab === "advanced" && (
-      <Card id="rtk">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">bolt</span>
-            Token Saver
-          </h2>
-        </div>
-        <div className="flex items-center justify-between pt-2 pb-4 border-b border-border gap-4">
-          <div className="min-w-0 flex-1">
-            <p className="font-medium">
-              Compress tool output{" "}
-              <a
-                href="https://github.com/rtk-ai/rtk"
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs font-normal text-primary underline hover:opacity-80"
-              >
-                (RTK)
-              </a>
-            </p>
-            <p className="text-sm text-text-muted">
-              git/grep/ls/tree/logs → 60-90% fewer input tokens
-            </p>
-          </div>
-          <Toggle
-            checked={rtkEnabled}
-            onChange={() => handleRtkEnabled(!rtkEnabled)}
-          />
-        </div>
-        <div className="flex items-center justify-between pt-4 gap-4 flex-wrap">
-          <div className="min-w-0 flex-1">
-            <p className="font-medium">
-              Compress LLM output{" "}
-              <a
-                href="https://github.com/JuliusBrussee/caveman"
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs font-normal text-primary underline hover:opacity-80"
-              >
-                (Caveman)
-              </a>
-            </p>
-            <p className="text-sm text-text-muted">
-              Terse-style system prompt → ~65% fewer output tokens (up to 87%)
-            </p>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            {cavemanEnabled && (
-              <div className="flex flex-col items-end gap-1">
-                <div className="flex items-center gap-1.5">
-                  {visibleCavemanLevels.map((lvl) => (
-                    <button
-                      key={lvl.id}
-                      onClick={() => handleCavemanLevel(lvl.id)}
-                      className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
-                        cavemanLevel === lvl.id
-                          ? "bg-primary text-white border-primary"
-                          : "bg-transparent border-border text-text-muted hover:bg-surface-2"
-                      }`}
-                      title={lvl.desc}
-                    >
-                      {lvl.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-primary">
-                  {CAVEMAN_LEVELS.find((lvl) => lvl.id === cavemanLevel)?.desc}
-                </p>
-              </div>
-            )}
-            <Toggle
-              checked={cavemanEnabled}
-              onChange={() => handleCavemanEnabled(!cavemanEnabled)}
-            />
-          </div>
-        </div>
-      </Card>
-      )}
-
-      {endpointTab === "keys" && (
+      {/* API Keys */}
       <Card id="require-api-key">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -1178,17 +1135,21 @@ export default function APIPageClient({ machineId }) {
 
         {isRemoteHost && !requireApiKey && (
           <div className="mb-4 -mt-2">
-            <GlassAlert hideIcon message="Endpoint is exposed without an API key." />
+            <SecurityWarning message="Endpoint is exposed without an API key." />
           </div>
         )}
 
         {keys.length === 0 ? (
-          <EmptyState
-            icon="vpn_key"
-            title="No API keys yet"
-            description="Create your first API key to get started"
-            action={{ label: "Create Key", icon: "add", onClick: () => setShowAddModal(true) }}
-          />
+          <div className="text-center py-12">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary mb-4">
+              <span className="material-symbols-outlined text-[32px]">vpn_key</span>
+            </div>
+            <p className="text-text-main font-medium mb-1">No API keys yet</p>
+            <p className="text-sm text-text-muted mb-4">Create your first API key to get started</p>
+            <Button icon="add" onClick={() => setShowAddModal(true)}>
+              Create Key
+            </Button>
+          </div>
         ) : (
           <div className="flex flex-col">
             {keys.map((key) => (
@@ -1259,7 +1220,167 @@ export default function APIPageClient({ machineId }) {
           </div>
         )}
       </Card>
-      )}
+
+      {/* Token Saver (RTK + Caveman) */}
+      <Card id="rtk">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary">bolt</span>
+            Token Saver
+          </h2>
+        </div>
+        <div className="flex items-center justify-between pt-2 pb-4 border-b border-border gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">
+              Compress tool output{" "}
+              <a
+                href="https://github.com/rtk-ai/rtk"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-normal text-primary underline hover:opacity-80"
+              >
+                (RTK)
+              </a>
+            </p>
+            <p className="text-sm text-text-muted">
+              git/grep/ls/tree/logs → 60-90% fewer input tokens
+            </p>
+          </div>
+          <Toggle
+            checked={rtkEnabled}
+            onChange={() => handleRtkEnabled(!rtkEnabled)}
+          />
+        </div>
+        <div className="flex items-center justify-between py-4 border-b border-border gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="font-medium">
+                Compress context{" "}
+                <a
+                  href="https://github.com/chopratejas/headroom"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-normal text-primary underline hover:opacity-80"
+                >
+                  (Headroom)
+                </a>
+              </p>
+              <span className={`text-xs px-2 py-0.5 rounded ${headroomRunning ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}>
+                {headroomStatusLabel}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowHeadroomInstallModal(true)}
+                className="text-xs text-primary underline hover:opacity-80"
+              >
+                  {headroomRunning ? "Manage" : "Setup"}
+              </button>
+            </div>
+            <p className="text-sm text-text-muted mt-1">
+              Compress prompts via /v1/compress before routing to the model
+            </p>
+          </div>
+          <Toggle
+            checked={headroomEnabled && headroomRunning}
+            disabled={!headroomRunning}
+            onChange={() => handleHeadroomEnabled(!headroomEnabled)}
+          />
+        </div>
+        <div className="flex items-center justify-between pt-4 gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">
+              Compress LLM output{" "}
+              <a
+                href="https://github.com/JuliusBrussee/caveman"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-normal text-primary underline hover:opacity-80"
+              >
+                (Caveman)
+              </a>
+            </p>
+            <p className="text-sm text-text-muted">
+              Terse-style system prompt → ~65% fewer output tokens (up to 87%)
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {cavemanEnabled && (
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1.5">
+                  {visibleCavemanLevels.map((lvl) => (
+                    <button
+                      key={lvl.id}
+                      onClick={() => handleCavemanLevel(lvl.id)}
+                      className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                        cavemanLevel === lvl.id
+                          ? "bg-primary text-white border-primary"
+                          : "bg-transparent border-border text-text-muted hover:bg-surface-2"
+                      }`}
+                      title={lvl.desc}
+                    >
+                      {lvl.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-primary">
+                  {CAVEMAN_LEVELS.find((lvl) => lvl.id === cavemanLevel)?.desc}
+                </p>
+              </div>
+            )}
+            <Toggle
+              checked={cavemanEnabled}
+              onChange={() => handleCavemanEnabled(!cavemanEnabled)}
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-between pt-4 mt-4 border-t border-border gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">
+              Lazy senior dev{" "}
+              <a
+                href="https://github.com/DietrichGebert/ponytail"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-normal text-primary underline hover:opacity-80"
+              >
+                (Ponytail)
+              </a>
+            </p>
+            <p className="text-sm text-text-muted">
+              Bias the model toward minimal code: YAGNI, reuse stdlib, deletion over addition
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {ponytailEnabled && (
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1.5">
+                  {PONYTAIL_LEVELS.map((lvl) => (
+                    <button
+                      key={lvl.id}
+                      onClick={() => handlePonytailLevel(lvl.id)}
+                      className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                        ponytailLevel === lvl.id
+                          ? "bg-primary text-white border-primary"
+                          : "bg-transparent border-border text-text-muted hover:bg-surface-2"
+                      }`}
+                      title={lvl.desc}
+                    >
+                      {lvl.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-primary">
+                  {PONYTAIL_LEVELS.find((lvl) => lvl.id === ponytailLevel)?.desc}
+                </p>
+              </div>
+            )}
+            <Toggle
+              checked={ponytailEnabled}
+              onChange={() => handlePonytailEnabled(!ponytailEnabled)}
+            />
+          </div>
+        </div>
+      </Card>
 
       {/* Add Key Modal */}
       <Modal
@@ -1476,6 +1597,67 @@ export default function APIPageClient({ machineId }) {
         </div>
       </Modal>
 
+      {/* Headroom Install Guide Modal */}
+      <Modal
+        isOpen={showHeadroomInstallModal}
+        title={headroomRunning ? "Headroom" : "Setup Headroom"}
+        onClose={() => setShowHeadroomInstallModal(false)}
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between text-sm">
+            <span>Status</span>
+            <span className={headroomRunning ? "text-success" : "text-warning"}>
+              {headroomStatusLabel}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium">Proxy URL</p>
+            <Input
+              value={headroomUrl}
+              onChange={(e) => setHeadroomUrl(e.target.value)}
+              onBlur={handleHeadroomUrlBlur}
+              placeholder="http://localhost:8787"
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-text-muted">
+              Use a local proxy for Start/Stop, or an external Docker sidecar like http://headroom:8787.
+            </p>
+          </div>
+          {headroomManaged ? (
+            <Button onClick={handleHeadroomStop} variant="ghost" fullWidth disabled={headroomActionLoading}>
+              {headroomActionLoading ? "Stopping…" : "Stop Headroom"}
+            </Button>
+          ) : headroomRunning ? (
+            <p className="text-sm text-success">Headroom proxy is reachable. You can enable the token saver.</p>
+          ) : headroomCanStart ? (
+            <Button onClick={handleHeadroomStart} fullWidth disabled={headroomActionLoading}>
+              {headroomActionLoading ? "Starting…" : "Start Headroom"}
+            </Button>
+          ) : !headroomLocalUrl ? (
+            <p className="text-sm text-warning">Start Headroom separately at the configured URL, then recheck.</p>
+          ) : !headroomStatus.python ? (
+            <p className="text-sm text-warning">Python ≥ 3.10 required for local managed mode. Install Python first, or use an external proxy URL.</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">Install then click Start:</p>
+              <div className="flex items-center gap-2">
+                <pre className="flex-1 rounded bg-black/5 dark:bg-white/5 p-2 text-xs font-mono overflow-x-auto">{`pip install "headroom-ai[proxy]"`}</pre>
+                <Button size="sm" variant="ghost" onClick={() => copy(`pip install "headroom-ai[proxy]"`)}>
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+            </div>
+          )}
+          {headroomActionError && (
+            <p className="text-sm text-warning">{headroomActionError}</p>
+          )}
+          <div className="flex gap-2">
+            <Button onClick={() => refreshHeadroomStatus()} variant="ghost" fullWidth>Recheck</Button>
+            <Button onClick={() => setShowHeadroomInstallModal(false)} fullWidth>Done</Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Confirm Modal */}
       <ConfirmModal
         isOpen={!!confirmState}
@@ -1488,61 +1670,6 @@ export default function APIPageClient({ machineId }) {
     </div>
   );
 }
-
-/** Reusable endpoint row component */
-function EndpointRow({ label, url, copyId, copied, onCopy, badge, actions }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className={`text-xs font-mono px-1.5 py-0.5 rounded shrink-0 min-w-[88px] text-center ${
-          (badge === "CF" || badge === "TS") ? "bg-primary/10 text-primary" : "bg-surface-2 text-text-muted"
-        }`}>{label}</span>
-      <Input value={url} readOnly className="flex-1 font-mono text-sm" />
-      <button
-        onClick={() => onCopy(url, copyId)}
-        className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-primary transition-colors shrink-0"
-      >
-        <span className="material-symbols-outlined text-[18px]">{copied === copyId ? "check" : "content_copy"}</span>
-      </button>
-      {actions}
-    </div>
-  );
-}
-
-/** Reusable status alert */
-function StatusAlert({ status, className = "" }) {
-  // Render URLs in message as clickable links
-  const renderMessage = (msg) => {
-    const parts = msg.split(/(https?:\/\/[^\s]+)/g);
-    return parts.map((part, i) =>
-      /^https?:\/\//.test(part)
-        ? <a key={i} href={part} target="_blank" rel="noreferrer" className="underline font-medium">{part}</a>
-        : part
-    );
-  };
-
-  return (
-    <div className={`p-2 rounded text-sm ${className} ${status.type === "success" ? "bg-green-500/10 text-green-600 dark:text-green-400" :
-        status.type === "warning" ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
-        status.type === "info" ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" :
-          "bg-red-500/10 text-red-600 dark:text-red-400"
-      }`}>
-      {renderMessage(status.message)}
-    </div>
-  );
-}
-
-/** Inline tooltip, Claude Code CLI style */
-function Tooltip({ text }) {
-  return (
-    <span className="relative group inline-flex items-center">
-      <span className="material-symbols-outlined text-[14px] text-text-muted cursor-help">help</span>
-      <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 z-50 w-64 rounded bg-gray-900 dark:bg-gray-800 text-white text-xs px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
-        {text}
-      </span>
-    </span>
-  );
-}
-
 
 
 APIPageClient.propTypes = {

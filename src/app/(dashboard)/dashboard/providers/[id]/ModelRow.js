@@ -2,6 +2,7 @@
 
 import PropTypes from "prop-types";
 import { cn } from "@/shared/utils/cn";
+import { CapacityBadges } from "@/shared/components";
 
 export default function ModelRow({
   model,
@@ -19,6 +20,7 @@ export default function ModelRow({
   onDisable,
   onEnable,
   layout = "grid",
+  caps,
 }) {
   const borderColor = isDisabled
     ? "border-default-300/50 opacity-70"
@@ -80,6 +82,7 @@ export default function ModelRow({
                 Disabled
               </span>
             )}
+            <CapacityBadges caps={caps} colorOverride="text-text-muted/70" size={12} />
           </div>
           {model.name && model.name !== model.id && (
             <span className="truncate text-[11px] text-text-muted pl-0.5">{model.name}</span>
@@ -177,4 +180,5 @@ ModelRow.propTypes = {
   onDisable: PropTypes.func,
   onEnable: PropTypes.func,
   layout: PropTypes.oneOf(["grid", "list"]),
+  caps: PropTypes.object,
 };
