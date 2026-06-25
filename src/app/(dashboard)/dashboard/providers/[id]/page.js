@@ -459,15 +459,23 @@ export default function ProviderDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ providerAlias: providerAliasOverride, id: modelId, type }),
       });
+      const data = await res.json();
       if (res.ok) {
+        if (data.added === false) {
+          notify.warning(translate("Model already exists"), translate("Add Custom Model"));
+          return false;
+        }
         await fetchCustomModels();
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("customModelChanged"));
-      } else {
-        const data = await res.json();
-        alert(data.error || "Failed to add custom model");
+        notify.success(translate("Model added successfully"), translate("Add Custom Model"));
+        return true;
       }
+      notify.error(data.error || translate("Failed to add custom model"), translate("Add Custom Model"));
+      return false;
     } catch (error) {
       console.log("Error adding custom model:", error);
+      notify.error(error.message || translate("Failed to add custom model"), translate("Add Custom Model"));
+      return false;
     }
   };
 
@@ -1408,6 +1416,7 @@ export default function ProviderDetailPage() {
           models={models}
           kiloFreeModels={kiloFreeModels}
           disabledModelIds={disabledModelIds}
+          customModels={customModels}
           modelAliases={modelAliases}
           modelTestResults={modelTestResults}
           testingModelId={testingModelId}
@@ -1419,6 +1428,7 @@ export default function ProviderDetailPage() {
           onCopy={copy}
           onSetAlias={handleSetAlias}
           onDeleteAlias={handleDeleteAlias}
+          onDeleteCustomModel={(modelId) => handleDeleteCustomModel(modelId, "llm", providerStorageAlias)}
           onTestModel={handleTestModel}
           onDisableModel={handleDisableModel}
           onEnableModel={handleEnableModel}
@@ -1511,8 +1521,8 @@ export default function ProviderDetailPage() {
           providerAlias={providerStorageAlias}
           providerDisplayAlias={providerDisplayAlias}
           onSave={async (modelId) => {
-            await handleAddCustomModel(modelId, "llm", providerStorageAlias);
-            setShowAddCustomModel(false);
+            const ok = await handleAddCustomModel(modelId, "llm", providerStorageAlias);
+            if (ok) setShowAddCustomModel(false);
           }}
           onClose={() => setShowAddCustomModel(false)}
         />

@@ -5,6 +5,7 @@ import PropTypes from "prop-types";
 import { Button, Input, SegmentedControl, StatusMetricChip, InlineFeedback } from "@/shared/components";
 import { cn } from "@/shared/utils/cn";
 import { translate } from "@/i18n/runtime";
+import { getProviderCustomModelRows } from "@/shared/utils/providerCustomModels";
 import ModelRow from "../[id]/ModelRow";
 import CompatibleModelsSection from "../[id]/CompatibleModelsSection";
 
@@ -26,6 +27,7 @@ export default function ModelsManagerPanel({
   models,
   kiloFreeModels,
   disabledModelIds,
+  customModels = [],
   modelAliases,
   modelTestResults,
   testingModelId,
@@ -37,6 +39,7 @@ export default function ModelsManagerPanel({
   onCopy,
   onSetAlias,
   onDeleteAlias,
+  onDeleteCustomModel,
   onTestModel,
   onDisableModel,
   onEnableModel,
@@ -78,23 +81,16 @@ export default function ModelsManagerPanel({
 
   const disabledSet = useMemo(() => new Set(disabledModelIds), [disabledModelIds]);
 
-  const customModels = useMemo(
+  const providerCustomRows = useMemo(
     () =>
-      Object.entries(modelAliases)
-        .filter(([alias, fullModel]) => {
-          const prefix = `${providerStorageAlias}/`;
-          if (!fullModel.startsWith(prefix)) return false;
-          const modelId = fullModel.slice(prefix.length);
-          if (providerInfo?.passthroughModels) return !models.some((m) => m.id === modelId);
-          return !models.some((m) => m.id === modelId) && alias === modelId;
-        })
-        .map(([alias, fullModel]) => ({
-          id: fullModel.slice(`${providerStorageAlias}/`.length),
-          alias,
-          fullModel,
-          isCustom: true,
-        })),
-    [modelAliases, providerStorageAlias, providerInfo, models]
+      getProviderCustomModelRows({
+        customModels,
+        modelAliases,
+        providerAlias: providerStorageAlias,
+        builtInModels: allModels,
+        type: "llm",
+      }),
+    [customModels, modelAliases, providerStorageAlias, allModels]
   );
 
   const builtInEntries = useMemo(
@@ -119,15 +115,16 @@ export default function ModelsManagerPanel({
 
   const customEntries = useMemo(
     () =>
-      customModels.map((m) => ({
-        model: { id: m.id, name: m.id },
-        id: m.id,
+      providerCustomRows.map((row) => ({
+        model: { id: row.id, name: row.name || row.id },
+        id: row.id,
         isCustom: true,
         isDisabled: false,
-        alias: m.alias,
-        testStatus: modelTestResults[m.id],
+        alias: row.alias,
+        source: row.source,
+        testStatus: modelTestResults[row.id],
       })),
-    [customModels, modelTestResults]
+    [providerCustomRows, modelTestResults]
   );
 
   const allEntries = useMemo(
@@ -181,7 +178,7 @@ export default function ModelsManagerPanel({
   }, [suggestedModels, modelAliases, providerStorageAlias, models]);
 
   const renderEntry = (entry) => {
-    const { model, id, isCustom, isDisabled, existingAlias, alias, testStatus } = entry;
+    const { model, id, isCustom, isDisabled, existingAlias, alias, source, testStatus } = entry;
 
     if (isDisabled && filter !== "disabled" && filter !== "all") return null;
 
@@ -197,7 +194,11 @@ export default function ModelsManagerPanel({
         onSetAlias={isCustom ? () => {} : (a) => onSetAlias(id, a, providerStorageAlias)}
         onDeleteAlias={
           isCustom
-            ? () => onDeleteAlias(alias)
+            ? source === "legacyAlias" && alias
+              ? () => onDeleteAlias(alias)
+              : onDeleteCustomModel
+                ? () => onDeleteCustomModel(id)
+                : undefined
             : existingAlias
               ? () => onDeleteAlias(existingAlias)
               : undefined
@@ -361,6 +362,7 @@ ModelsManagerPanel.propTypes = {
   models: PropTypes.array,
   kiloFreeModels: PropTypes.array,
   disabledModelIds: PropTypes.array,
+  customModels: PropTypes.array,
   modelAliases: PropTypes.object,
   modelTestResults: PropTypes.object,
   testingModelId: PropTypes.string,
@@ -372,6 +374,7 @@ ModelsManagerPanel.propTypes = {
   onCopy: PropTypes.func,
   onSetAlias: PropTypes.func,
   onDeleteAlias: PropTypes.func,
+  onDeleteCustomModel: PropTypes.func,
   onTestModel: PropTypes.func,
   onDisableModel: PropTypes.func,
   onEnableModel: PropTypes.func,
