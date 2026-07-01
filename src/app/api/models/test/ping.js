@@ -177,7 +177,8 @@ export async function pingModelByKind(model, kind, baseUrl = `http://127.0.0.1:$
     };
   }
 
-  const hasChoices = Array.isArray(parsed?.choices) && parsed.choices.length > 0;
+  const choices = parsed?.choices || parsed?.data?.choices;
+  const hasChoices = Array.isArray(choices) && choices.length > 0;
   if (!hasChoices) {
     return {
       ok: false,

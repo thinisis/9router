@@ -35,3 +35,18 @@ export function buildClineHeaders(token, extraHeaders = {}) {
 
   return headers;
 }
+
+/** Cline non-streaming chat completions wrap the OpenAI body under `data`. */
+export function unwrapClineCompletionResponse(body) {
+  if (!body || typeof body !== "object") return body;
+  if (Array.isArray(body.choices)) return body;
+  const inner = body.data;
+  if (inner && typeof inner === "object" && Array.isArray(inner.choices)) {
+    return inner;
+  }
+  return body;
+}
+
+export function isClineFamilyProvider(provider) {
+  return provider === "cline" || provider === "clinepass";
+}

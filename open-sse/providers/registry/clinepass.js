@@ -5,9 +5,9 @@ export default {
   uiAlias: "clinepass",
   display: {
     name: "ClinePass",
-    icon: "vpn_key",
+    icon: "smart_toy",
     color: "#5B9BD5",
-    textIcon: "CP",
+    textIcon: "CL",
     website: "https://cline.bot",
     notice: {
       signupUrl: "https://app.cline.bot",
