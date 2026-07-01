@@ -6,6 +6,7 @@ import { refreshGoogleToken, updateProviderCredentials } from "@/sse/services/to
 import { resolveOllamaLocalHost } from "open-sse/config/providers.js";
 import { resolveKiroModels } from "open-sse/services/kiroModels.js";
 import { resolveQoderModels } from "open-sse/services/qoderModels.js";
+import { resolveClinepassModels } from "open-sse/services/clinepassModels.js";
 
 const GEMINI_CLI_MODELS_URL = "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";
 
@@ -342,6 +343,25 @@ const PROVIDER_MODELS_CONFIG = {
       parseFn: parseGeminiCliModels,
       errorLabel: "Failed to fetch Gemini CLI models"
     })
+  },
+  clinepass: {
+    customResolver: async (connection) => {
+      let warning;
+      try {
+        const result = await resolveClinepassModels({
+          accessToken: connection.accessToken,
+          apiKey: connection.apiKey,
+        });
+        if (result?.models?.length) {
+          return { models: result.models };
+        }
+        warning = "ClinePass returned no models; falling back to static catalog.";
+      } catch (error) {
+        warning = `Failed to fetch ClinePass models: ${error.message}`;
+        console.log("Failed to fetch ClinePass models dynamically, falling back to static:", error.message);
+      }
+      return { models: [], warning };
+    },
   },
   "ollama-local": {
     customResolver: async (connection) => {

@@ -15,6 +15,7 @@ import {
   QWEN_CONFIG,
   CLAUDE_CONFIG,
   CLINE_CONFIG,
+  CLINEPASS_CONFIG,
   KILOCODE_CONFIG,
 } from "@/lib/oauth/constants/oauth";
 import { buildClineHeaders } from "@/shared/utils/clineAuth";
@@ -83,6 +84,7 @@ const OAUTH_TEST_CONFIG = {
     authPrefix: "Bearer ",
   },
   cline: { refreshable: true },
+  clinepass: { refreshable: true },
   gitlab: {
     // Test by hitting the GitLab user API — requires api or read_user scope
     url: "https://gitlab.com/api/v4/user",
@@ -187,8 +189,9 @@ async function refreshOAuthToken(connection) {
       return { accessToken: data.access_token, expiresIn: data.expires_in, refreshToken: data.refresh_token || refreshToken };
     }
 
-    if (provider === "cline") {
-      const response = await fetch(CLINE_CONFIG.refreshUrl, {
+    if (provider === "cline" || provider === "clinepass") {
+      const refreshUrl = provider === "clinepass" ? CLINEPASS_CONFIG.refreshUrl : CLINE_CONFIG.refreshUrl;
+      const response = await fetch(refreshUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
@@ -203,8 +206,12 @@ async function refreshOAuthToken(connection) {
       const expiresIn = data?.expiresAt
         ? Math.max(1, Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000))
         : 3600;
+      let accessToken = data?.accessToken;
+      if (accessToken && !accessToken.startsWith("workos:")) {
+        accessToken = `workos:${accessToken}`;
+      }
       return {
-        accessToken: data?.accessToken,
+        accessToken,
         expiresIn,
         refreshToken: data?.refreshToken || refreshToken,
       };
@@ -253,7 +260,7 @@ async function testOAuthConnection(connection, effectiveProxy = null) {
     return { valid: true, error: null, refreshed: false, newTokens: null };
   }
 
-  if (connection.provider === "cline") {
+  if (connection.provider === "cline" || connection.provider === "clinepass") {
     const tryProbe = async (token) => {
       const res = await probeClineAccessToken(token);
       if (res.ok) return { valid: true, error: null, refreshed, newTokens };
@@ -432,6 +439,12 @@ async function testApiKeyConnection(connection, effectiveProxy = null) {
       }
       case "openrouter": {
         const res = await fetchWithConnectionProxy("https://openrouter.ai/api/v1/auth/key", { headers: { Authorization: `Bearer ${connection.apiKey}` } }, effectiveProxy);
+        return { valid: res.ok, error: res.ok ? null : "Invalid API key" };
+      }
+      case "clinepass": {
+        const res = await fetchWithConnectionProxy("https://api.cline.bot/api/v1/models", {
+          headers: { Authorization: `Bearer ${connection.apiKey}`, Accept: "application/json" },
+        }, effectiveProxy);
         return { valid: res.ok, error: res.ok ? null : "Invalid API key" };
       }
       case "glm": {

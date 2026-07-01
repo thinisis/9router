@@ -233,8 +233,8 @@ export async function POST(request, { params }) {
         });
       }
 
-      // Cline uses authorization_code without PKCE
-      const noPkceExchangeProviders = ["cline"];
+      // Cline and ClinePass use authorization_code without PKCE
+      const noPkceExchangeProviders = ["cline", "clinepass"];
       if (!code || !redirectUri || (!codeVerifier && !noPkceExchangeProviders.includes(provider))) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
       }
