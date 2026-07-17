@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Card, Button, Input, Select, Toggle, PageBackLink } from "@/shared/components";
+import { Card, Button, Input, Select, Toggle } from "@/shared/components";
 import { AI_PROVIDERS, AUTH_METHODS } from "@/shared/constants/config";
 
 const providerOptions = Object.values(AI_PROVIDERS).map((p) => ({
@@ -73,10 +73,20 @@ export default function NewProviderPage() {
   const selectedProvider = AI_PROVIDERS[formData.provider];
 
   return (
-    <div className="w-full min-w-0">
+    <div className="max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <PageBackLink href="/dashboard/providers" label="Back to Providers" />
+        <Link
+          href="/dashboard/providers"
+          className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-primary transition-colors mb-4"
+        >
+          <span className="material-symbols-outlined text-lg">arrow_back</span>
+          Back to Providers
+        </Link>
+        <h1 className="text-3xl font-semibold tracking-tight">Add New Provider</h1>
+        <p className="text-text-muted mt-2">
+          Configure a new AI provider to use with your applications.
+        </p>
       </div>
 
       {/* Form */}

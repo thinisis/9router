@@ -1,18 +1,7 @@
 "use client";
 
-import { Drawer as HeroDrawer, useOverlayState } from "@heroui/react";
+import { useEffect } from "react";
 import { cn } from "@/shared/utils/cn";
-
-/** Width applies to Drawer.Dialog (panel), not Drawer.Content (viewport flex shell). */
-const DIALOG_WIDTHS = {
-  sm: "w-[min(100vw,400px)] max-w-[100vw]",
-  md: "w-[min(100vw,500px)] max-w-[100vw]",
-  lg: "w-[min(100vw,600px)] max-w-[100vw]",
-  xl: "w-[min(100vw,800px)] max-w-[100vw]",
-  "2xl": "w-[min(100vw,960px)] max-w-[100vw]",
-  "3xl": "w-full max-w-[100vw] sm:w-[min(92vw,1100px)]",
-  full: "w-full max-w-[100vw]",
-};
 
 export default function Drawer({
   isOpen,
@@ -20,42 +9,74 @@ export default function Drawer({
   title,
   children,
   width = "md",
-  className,
+  className
 }) {
-  const state = useOverlayState({
-    isOpen,
-    onOpenChange: (open) => {
-      if (!open) onClose();
-    },
-  });
+  const widths = {
+    sm: "w-[400px]",
+    md: "w-[500px]",
+    lg: "w-[600px]",
+    xl: "w-[800px]",
+    full: "w-full",
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape" && isOpen) onClose();
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
-    <HeroDrawer state={state}>
-      <HeroDrawer.Backdrop isDismissable>
-        <HeroDrawer.Content placement="right">
-          <HeroDrawer.Dialog
-            className={cn(
-              "glass-popup",
-              DIALOG_WIDTHS[width] || DIALOG_WIDTHS.md,
-              className,
-            )}
-          >
+    <div className="fixed inset-0 z-50">
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-[2px] fade-in cursor-pointer"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Drawer panel */}
+      <div className={cn(
+        "absolute right-0 top-0 h-full bg-surface flex flex-col",
+        "shadow-[var(--shadow-elev)]",
+        "slide-in-right",
+        "border-l border-border-subtle",
+        widths[width] || widths.md,
+        className
+      )}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-border-subtle flex-shrink-0">
+          <div className="flex items-center gap-3">
             {title && (
-              <HeroDrawer.Header className="flex items-center justify-between gap-3 border-b border-divider">
-                <HeroDrawer.Heading className="font-display text-lg font-semibold">
-                  {title}
-                </HeroDrawer.Heading>
-                <HeroDrawer.CloseTrigger />
-              </HeroDrawer.Header>
+              <h2 className="text-lg font-semibold text-text-main">{title}</h2>
             )}
-            <HeroDrawer.Body className="custom-scrollbar overflow-y-auto">
-              {children}
-            </HeroDrawer.Body>
-          </HeroDrawer.Dialog>
-        </HeroDrawer.Content>
-      </HeroDrawer.Backdrop>
-    </HeroDrawer>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-[10px] text-text-muted hover:bg-surface-2 hover:text-text-main transition-colors"
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }

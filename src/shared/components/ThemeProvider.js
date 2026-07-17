@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import useThemeStore from "@/store/themeStore";
-import GsapRoot from "@/shared/components/GsapRoot";
 
 export function ThemeProvider({ children }) {
   const { initTheme } = useThemeStore();
@@ -11,6 +10,6 @@ export function ThemeProvider({ children }) {
     initTheme();
   }, [initTheme]);
 
-  return <GsapRoot>{children}</GsapRoot>;
+  return <>{children}</>;
 }
 

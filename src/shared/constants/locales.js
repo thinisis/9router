@@ -1,5 +1,43 @@
 import { LOCALE_NAMES } from "@/i18n/config";
 
+// Centralized locale display flags (shared across UI components)
+export const LOCALE_FLAGS = {
+  en: "🇺🇸",
+  vi: "🇻🇳",
+  "zh-CN": "🇨🇳",
+  "zh-TW": "🇹🇼",
+  ja: "🇯🇵",
+  "pt-BR": "🇧🇷",
+  "pt-PT": "🇵🇹",
+  ko: "🇰🇷",
+  es: "🇪🇸",
+  de: "🇩🇪",
+  fr: "🇫🇷",
+  he: "🇮🇱",
+  ar: "🇸🇦",
+  ru: "🇷🇺",
+  pl: "🇵🇱",
+  cs: "🇨🇿",
+  nl: "🇳🇱",
+  tr: "🇹🇷",
+  uk: "🇺🇦",
+  tl: "🇵🇭",
+  id: "🇮🇩",
+  th: "🇹🇭",
+  hi: "🇮🇳",
+  bn: "🇧🇩",
+  ur: "🇵🇰",
+  ro: "🇷🇴",
+  sv: "🇸🇪",
+  it: "🇮🇹",
+  el: "🇬🇷",
+  hu: "🇭🇺",
+  fi: "🇫🇮",
+  da: "🇩🇰",
+  no: "🇳🇴",
+  fa: "🇮🇷",
+};
+
 /** ISO 3166-1 alpha-2 country codes mapped to /public/flags/{code}.svg */
 export const LOCALE_META = {
   en: { countryCode: "us", nativeName: "English", englishName: "English" },

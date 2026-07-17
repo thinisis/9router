@@ -3,7 +3,7 @@
 import { useParams, notFound, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Card, Badge, Button, Toggle, AddCustomEmbeddingModal, ProviderConnectionStatus } from "@/shared/components";
+import { Card, Badge, Button, Toggle, AddCustomEmbeddingModal } from "@/shared/components";
 import ProviderIcon from "@/shared/components/ProviderIcon";
 import { MEDIA_PROVIDER_KINDS, AI_PROVIDERS, getProvidersByKind } from "@/shared/constants/providers";
 
@@ -35,6 +35,19 @@ function MediaProviderCard({ provider, kind, connections, isCustom, onToggle }) 
     if (onToggle) onToggle(provider.id, allDisabled);
   };
 
+  const renderStatus = () => {
+    if (isNoAuth) return <Badge variant="success" size="sm">Ready</Badge>;
+    if (allDisabled) return <Badge variant="default" size="sm">Disabled</Badge>;
+    if (total === 0) return <span className="text-xs text-text-muted">No connections</span>;
+    return (
+      <>
+        {connected > 0 && <Badge variant="success" size="sm" dot>{connected} Connected</Badge>}
+        {error > 0 && <Badge variant="error" size="sm" dot>{error} Error</Badge>}
+        {connected === 0 && error === 0 && <Badge variant="default" size="sm">{total} Added</Badge>}
+      </>
+    );
+  };
+
   return (
     <Link href={`/dashboard/media-providers/${kind}/${provider.id}`} className="group">
       <Card
@@ -56,17 +69,11 @@ function MediaProviderCard({ provider, kind, connections, isCustom, onToggle }) 
                 fallbackColor={provider.color}
               />
             </div>
-            <div className="min-w-0" data-i18n-skip>
-              <h3 className="truncate font-semibold text-sm">{provider.name}</h3>
-              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5">
-                <ProviderConnectionStatus
-                  connected={connected}
-                  error={error}
-                  addedCount={connected === 0 && error === 0 ? total : 0}
-                  isNoAuth={isNoAuth}
-                  allDisabled={allDisabled}
-                />
+            <div className="min-w-0">
+              <h3 className="font-semibold text-sm">{provider.name}</h3>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 {isCustom && <Badge variant="default" size="sm">Custom</Badge>}
+                {renderStatus()}
               </div>
             </div>
           </div>
