@@ -1,0 +1,17 @@
+# Fork-owned liquid-glass UI layer (HeroUI + GSAP).
+# Prefer keeping our UI when merging upstream to reduce conflict churn.
+# Requires once per clone: git config merge.ours.driver true
+src/shared/components/** merge=ours
+src/shared/hooks/useGsapPress.js merge=ours
+src/shared/hooks/useReveal.js merge=ours
+src/shared/lib/gsapClient.js merge=ours
+src/shared/utils/motion.js merge=ours
+src/styles/tokens/** merge=ours
+src/app/globals.css merge=ours
+src/app/layout.js merge=ours
+src/app/login/** merge=ours
+src/i18n/RuntimeI18nProvider.js merge=ours
+src/app/(dashboard)/dashboard/OverviewPageClient.js merge=ours
+src/app/(dashboard)/dashboard/providers/page.js merge=ours
+src/app/(dashboard)/dashboard/providers/components/ModelsManagerPanel.js merge=ours
+src/app/(dashboard)/dashboard/usage/components/request-detail/** merge=ours

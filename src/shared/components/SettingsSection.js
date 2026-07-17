@@ -1,8 +1,8 @@
 "use client";
 
 import PropTypes from "prop-types";
+import { Card } from "@heroui/react";
 import { cn } from "@/shared/utils/cn";
-import Card from "./Card";
 
 export default function SettingsSection({
   icon,
@@ -17,37 +17,37 @@ export default function SettingsSection({
   const HeaderTag = collapsible ? "button" : "div";
 
   return (
-    <Card padding="none" className={cn("overflow-hidden", className)} data-reveal>
+    <Card variant="default" className={cn("overflow-hidden", className)} data-reveal>
       <HeaderTag
         type={collapsible ? "button" : undefined}
         onClick={collapsible ? onToggle : undefined}
         className={cn(
           "w-full flex items-start gap-4 p-5 sm:p-6 text-left",
-          collapsible && "hover:bg-surface-2 transition-colors cursor-pointer"
+          collapsible && "hover:bg-default-100/50 transition-colors cursor-pointer"
         )}
       >
         {icon && (
-          <div className="flex items-center justify-center size-11 shrink-0 rounded-xl bg-brand-500/10 text-brand-500">
+          <div className="flex items-center justify-center size-11 shrink-0 rounded-xl bg-primary/10 text-primary">
             <span className="material-symbols-outlined text-[22px]">{icon}</span>
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h2 className="font-display text-lg font-semibold tracking-tight text-text-main">{title}</h2>
+          <h2 className="font-display text-lg font-semibold tracking-tight text-foreground">{title}</h2>
           {description && (
-            <p className="text-sm text-text-muted mt-1 leading-relaxed">{description}</p>
+            <p className="text-sm text-default-500 mt-1 leading-relaxed">{description}</p>
           )}
         </div>
         {collapsible && (
-          <span className="material-symbols-outlined text-text-muted shrink-0 mt-1">
+          <span className="material-symbols-outlined text-default-400 shrink-0 mt-1">
             {expanded ? "expand_less" : "expand_more"}
           </span>
         )}
       </HeaderTag>
 
       {(!collapsible || expanded) && (
-        <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-0 border-t border-border-subtle">
+        <Card.Content className="px-5 sm:px-6 pb-5 sm:pb-6 pt-0 border-t border-divider">
           <div className="pt-5">{children}</div>
-        </div>
+        </Card.Content>
       )}
     </Card>
   );

@@ -65,7 +65,7 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
       setError(err.message);
       setStep("error");
     }
-  }, [authData, provider, onSuccess, oauthMeta]);
+  }, [authData, provider, onSuccess]);
 
   const completeXaiManualCode = useCallback(async (code) => {
     if (!authData?.state) return;
@@ -156,17 +156,8 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
     try {
       setError(null);
 
-      // Device code flow providers (must match oauth providers with flowType: "device_code")
-      const deviceCodeProviders = [
-        "github",
-        "qwen",
-        "kiro",
-        "kimi-coding",
-        "kilocode",
-        "codebuddy-cn",
-        "qoder",
-        "grok-cli",
-      ];
+      // Device code flow providers
+      const deviceCodeProviders = ["github", "qwen", "kiro", "kimi-coding", "kilocode", "codebuddy-cn", "qoder"];
       if (deviceCodeProviders.includes(provider)) {
         setIsDeviceCode(true);
         setStep("waiting");
@@ -293,17 +284,6 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         xaiServerSide,
       });
 
-      // Guard: device_code providers return authUrl:null from /authorize. Never window.open(null)
-      // (browsers coerce it to the relative path ".../null").
-      if (!data.authUrl) {
-        if (data.flowType === "device_code") {
-          throw new Error(
-            `Provider ${provider} uses device-code login but is not wired in the OAuth modal device-code list`
-          );
-        }
-        throw new Error("No authorization URL returned from OAuth provider");
-      }
-
       if (provider === "codex" && codexProxyActive) {
         // Proxy active: callback will be handled server-side (auto-exchange) or via channels (fallback)
         setStep("waiting");
@@ -414,7 +394,7 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
     const handleCallback = async (data) => {
       if (callbackProcessedRef.current) return; // Already processed
 
-      const { code, token, state, error: callbackError, errorDescription } = data;
+      const { code, state, error: callbackError, errorDescription } = data;
 
       if (callbackError) {
         callbackProcessedRef.current = true;
@@ -423,9 +403,9 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         return;
       }
 
-      if (token || code) {
+      if (code) {
         callbackProcessedRef.current = true;
-        await exchangeTokens(token || code, state);
+        await exchangeTokens(code, state);
       }
     };
 
@@ -504,14 +484,8 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         return;
       }
 
-      if (provider === "kimchi" && input && !input.includes("://") && !input.includes("?")) {
-        await exchangeTokens(input, null);
-        return;
-      }
-
       const url = new URL(input);
       const code = url.searchParams.get("code");
-      const token = url.searchParams.get("token");
       const state = url.searchParams.get("state");
       const errorParam = url.searchParams.get("error");
 
@@ -519,17 +493,11 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         throw new Error(url.searchParams.get("error_description") || errorParam);
       }
 
-      if (!code && !token) {
-        throw new Error(
-          provider === "xai"
-            ? "Paste the callback URL or copied xAI code"
-            : provider === "kimchi"
-              ? "No Kimchi token found in URL"
-              : "No authorization code found in URL"
-        );
+      if (!code) {
+        throw new Error(provider === "xai" ? "Paste the callback URL or copied xAI code" : "No authorization code found in URL");
       }
 
-      await exchangeTokens(token || code, state);
+      await exchangeTokens(code, state);
     } catch (err) {
       setError(err.message);
       setStep("error");
@@ -548,14 +516,11 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
 
   if (!provider || !providerInfo) return null;
   const isXaiProvider = provider === "xai";
-  const isKimchiProvider = provider === "kimchi";
   const deviceLoginUrl = deviceData?.verification_uri_complete || deviceData?.verification_uri || "";
   const modalTitle = isXaiProvider ? "Connect Grok Build OAuth" : `Connect ${providerInfo.name}`;
   const manualPlaceholder = isXaiProvider
     ? "http://127.0.0.1:56121/callback?code=... or copied code"
-    : isKimchiProvider
-      ? `${placeholderUrl.replace("code=...", "token=...")} or copied token`
-      : placeholderUrl;
+    : placeholderUrl;
 
   return (
     <Modal isOpen={isOpen} title={modalTitle} onClose={handleClose} size="lg">
@@ -596,13 +561,11 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
 
               <div>
                 <p className="text-sm font-medium mb-2">
-                  Step 2: Paste the {provider === "xai" ? "callback URL or copied code" : isKimchiProvider ? "callback URL or copied token" : "callback URL"} here
+                  Step 2: Paste the {provider === "xai" ? "callback URL or copied code" : "callback URL"} here
                 </p>
                 <p className="text-xs text-text-muted mb-2">
                   {provider === "xai"
                     ? "If xAI shows a code instead of redirecting, paste that code here."
-                    : isKimchiProvider
-                      ? "After authorization, copy the full callback URL or token from your browser."
                     : "After authorization, copy the full URL from your browser."}
                 </p>
                 <Input

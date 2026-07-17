@@ -4,18 +4,18 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Card, Button, Badge, Input, Modal, CardSkeleton, OAuthModal, KiroOAuthWrapper, CursorAuthModal, IFlowCookieModal, GitLabAuthModal, Toggle, Select, EditConnectionModal, NoAuthProxyCard, ConfirmModal } from "@/shared/components";
-import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, WEB_COOKIE_PROVIDERS, getProviderAlias, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, AI_PROVIDERS } from "@/shared/constants/providers";
-import { getModelsByProviderId, getModelKind } from "@/shared/constants/models";
-import { getThinkingLevels } from "open-sse/providers/thinkingLevels.js";
+import { Card, Button, Badge, Input, Modal, CardSkeleton, OAuthModal, KiroOAuthWrapper, CursorAuthModal, IFlowCookieModal, GitLabAuthModal, Toggle, Select, EditConnectionModal, NoAuthProxyCard, ConfirmModal, PageBackLink } from "@/shared/components";
+import GlassAlert from "@/shared/components/GlassAlert";
+import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, WEB_COOKIE_PROVIDERS, getProviderAlias, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, AI_PROVIDERS, THINKING_CONFIG } from "@/shared/constants/providers";
+import { getModelsByProviderId } from "@/shared/constants/models";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { useModelCaps } from "@/shared/hooks/useModelCaps";
-import { translate } from "@/i18n/runtime";
+import { translate, translateFormat } from "@/i18n/runtime";
 import { fetchSuggestedModels } from "@/shared/utils/providerModelsFetcher";
-import { getProviderCustomModelRows } from "@/shared/utils/providerCustomModels";
-import ModelRow from "./ModelRow";
 import PassthroughModelsSection from "./PassthroughModelsSection";
-import CompatibleModelsSection from "./CompatibleModelsSection";
+import ModelsManagerPanel from "../components/ModelsManagerPanel";
+import { useNotificationStore } from "@/store/notificationStore";
+import { StatusMetricChip } from "@/shared/components";
 import ConnectionRow from "./ConnectionRow";
 import AddApiKeyModal from "./AddApiKeyModal";
 import EditCompatibleNodeModal from "./EditCompatibleNodeModal";
@@ -23,11 +23,6 @@ import AddCustomModelModal from "./AddCustomModelModal";
 import BulkImportCodexModal from "./BulkImportCodexModal";
 
 const ONE_BY_ONE_DELAY_MS = 1000;
-
-const AUTO_PING_SETTINGS_KEYS = {
-  claude: "claudeAutoPing",
-  codex: "codexAutoPing",
-};
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,7 +51,7 @@ export default function ProviderDetailPage() {
   const [headerImgError, setHeaderImgError] = useState(false);
   const [modelTestResults, setModelTestResults] = useState({});
   const [modelsTestError, setModelsTestError] = useState("");
-  const [testingModelIds, setTestingModelIds] = useState(() => new Set());
+  const [testingModelId, setTestingModelId] = useState(null);
   const [showAddCustomModel, setShowAddCustomModel] = useState(false);
   const [selectedConnectionIds, setSelectedConnectionIds] = useState([]);
   const [bulkProxyPoolId, setBulkProxyPoolId] = useState("__none__");
@@ -78,6 +73,7 @@ export default function ProviderDetailPage() {
   const stopOneByOneRef = useRef(false);
   const [importingQoderModels, setImportingQoderModels] = useState(false);
   const { copied, copy } = useCopyToClipboard();
+  const notify = useNotificationStore();
 
   const AG_RISK_STORAGE_KEY = "ag_risk_confirmed";
 
@@ -148,38 +144,11 @@ export default function ProviderDetailPage() {
   const isAnthropicCompatible = isAnthropicCompatibleProvider(providerId);
   const isCompatible = isOpenAICompatible || isAnthropicCompatible;
   const hasDualAuthModes = !isCompatible && isOAuth && supportsApiKeyAuth;
-  const oauthConnectionLabel =
-    providerId === "xai" ? "Grok Build OAuth"
-    : providerId === "grok-cli" ? "Grok CLI Device Login"
-    : "OAuth";
+  const oauthConnectionLabel = providerId === "xai" ? "Grok Build OAuth" : "OAuth";
   const apiKeyConnectionLabel = providerId === "xai" ? "xAI API Key" : "API Key";
-  // Resolve suffix "(level)" for a model when a thinking level is picked and the model supports it.
-  const resolveThinkingSuffix = (modelId) => {
-    if (!thinkingMode || thinkingMode === "auto") return null;
-    const levels = getThinkingLevels(providerId, modelId);
-    return levels && levels.includes(thinkingMode) ? thinkingMode : null;
-  };
+  const thinkingConfig = AI_PROVIDERS[providerId]?.thinkingConfig || THINKING_CONFIG.extended;
+  
   const providerStorageAlias = isCompatible ? providerId : providerAlias;
-  // Union of levels across this provider's reasoning models — drives the level picker options.
-  // Include custom models too (e.g. manually added gpt-5.6-sol → max).
-  const providerThinkingLevels = (() => {
-    const set = new Set();
-    const seen = new Set();
-    const addLevels = (modelId) => {
-      if (!modelId || seen.has(modelId)) return;
-      seen.add(modelId);
-      const lv = getThinkingLevels(providerId, modelId);
-      if (lv) lv.forEach((l) => { if (l !== "none") set.add(l); });
-    };
-    for (const m of models) addLevels(m.id);
-    for (const m of kiloFreeModels) addLevels(m.id);
-    for (const entry of customModels) {
-      if (entry.providerAlias !== providerStorageAlias) continue;
-      if ((entry.kind || entry.type || "llm") !== "llm") continue;
-      addLevels(entry.id);
-    }
-    return set.size ? ["auto", ...[...set]] : null;
-  })();
   const providerDisplayAlias = isCompatible
     ? (providerNode?.prefix || providerId)
     : providerAlias;
@@ -306,8 +275,7 @@ export default function ProviderDetailPage() {
       // Load per-provider thinking config
       const thinkingCfg = (settingsData.providerThinking || {})[providerId] || {};
       setThinkingMode(thinkingCfg.mode || "auto");
-      const autoPingSettingsKey = AUTO_PING_SETTINGS_KEYS[providerId];
-      const apCfg = autoPingSettingsKey ? settingsData[autoPingSettingsKey] || {} : {};
+      const apCfg = settingsData.claudeAutoPing || {};
       setAutoPing({ enabled: apCfg.enabled === true, connections: apCfg.connections || {} });
       if (nodesRes.ok) {
         let node = (nodesData.nodes || []).find((entry) => entry.id === providerId) || null;
@@ -422,15 +390,12 @@ export default function ProviderDetailPage() {
   };
 
   const saveAutoPing = async (next) => {
-    const autoPingSettingsKey = AUTO_PING_SETTINGS_KEYS[providerId];
-    if (!autoPingSettingsKey) return;
-
     setAutoPing(next);
     try {
       await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [autoPingSettingsKey]: next }),
+        body: JSON.stringify({ claudeAutoPing: next }),
       });
     } catch (error) {
       console.log("Error saving auto-ping config:", error);
@@ -494,15 +459,23 @@ export default function ProviderDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ providerAlias: providerAliasOverride, id: modelId, type }),
       });
+      const data = await res.json();
       if (res.ok) {
+        if (data.added === false) {
+          notify.warning(translate("Model already exists"), translate("Add Custom Model"));
+          return false;
+        }
         await fetchCustomModels();
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("customModelChanged"));
-      } else {
-        const data = await res.json();
-        alert(data.error || "Failed to add custom model");
+        notify.success(translate("Model added successfully"), translate("Add Custom Model"));
+        return true;
       }
+      notify.error(data.error || translate("Failed to add custom model"), translate("Add Custom Model"));
+      return false;
     } catch (error) {
       console.log("Error adding custom model:", error);
+      notify.error(error.message || translate("Failed to add custom model"), translate("Add Custom Model"));
+      return false;
     }
   };
 
@@ -524,7 +497,7 @@ export default function ProviderDetailPage() {
     if (importingQoderModels) return;
     const activeConnection = connections.find((conn) => conn.isActive !== false);
     if (!activeConnection) {
-      alert(translate("Please add an active Qoder connection first"));
+      notify.warning(translate("Please add an active Qoder connection first"), "Qoder import");
       return;
     }
 
@@ -533,12 +506,12 @@ export default function ProviderDetailPage() {
       const res = await fetch(`/api/providers/${activeConnection.id}/models`);
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || translate("Failed to fetch models"));
+        notify.error(data.error || translate("Failed to fetch models"), "Qoder import");
         return;
       }
       const models = data.models || [];
       if (models.length === 0) {
-        alert(translate("No models returned"));
+        notify.info(translate("No models returned"), "Qoder import");
         return;
       }
 
@@ -546,8 +519,7 @@ export default function ProviderDetailPage() {
       for (const model of models) {
         const modelId = model.id || model.name;
         if (!modelId) continue;
-        
-        // Qoder model ID format may be "qoder/auto" or "auto", need to remove prefix
+
         const cleanModelId = modelId.replace(/^qoder\//, "");
         const alreadyExists = customModels.some(
           (entry) => entry.providerAlias === providerStorageAlias && entry.id === cleanModelId && (entry.kind || entry.type || "llm") === "llm"
@@ -559,15 +531,18 @@ export default function ProviderDetailPage() {
         await handleAddCustomModel(cleanModelId, "llm", providerStorageAlias);
         importedCount += 1;
       }
-      
+
       if (importedCount === 0) {
-        alert(translate("All models already exist, no new models added"));
+        notify.info(translate("All models already exist, no new models added"), "Qoder import");
       } else {
-        alert(translate("Successfully added") + ` ${importedCount} ` + translate("models"));
+        notify.success(
+          `${translate("Successfully added")} ${importedCount} ${translate("models")}`,
+          "Qoder import"
+        );
       }
     } catch (error) {
       console.log("Error importing Qoder models:", error);
-      alert(translate("Error fetching models") + ": " + error.message);
+      notify.error(`${translate("Error fetching models")}: ${error.message}`, "Qoder import");
     } finally {
       setImportingQoderModels(false);
     }
@@ -656,6 +631,11 @@ export default function ProviderDetailPage() {
       setOneByOneRunning(false);
       setOneByOneStopping(false);
       stopOneByOneRef.current = false;
+      if (passed === connections.length) {
+        notify.success(`All ${connections.length} connections passed`, "Connection test");
+      } else if (failed > 0) {
+        notify.warning(`${passed}/${connections.length} passed, ${failed} failed`, "Connection test");
+      }
     }
   };
 
@@ -674,37 +654,16 @@ export default function ProviderDetailPage() {
         try {
           const res = await fetch(`/api/providers/${id}`, { method: "DELETE" });
           if (res.ok) {
-            setConnections(prev => prev.filter(c => c.id !== id));
+            setConnections(connections.filter(c => c.id !== id));
+            notify.success("Connection deleted", "Providers");
+          } else {
+            const data = await res.json().catch(() => ({}));
+            notify.error(data.error || "Failed to delete connection", "Providers");
           }
         } catch (error) {
           console.log("Error deleting connection:", error);
+          notify.error("Failed to delete connection", "Providers");
         }
-      }
-    });
-  };
-
-  const handleBulkDelete = () => {
-    const count = selectedConnectionIds.length;
-    if (count === 0) return;
-    setConfirmState({
-      title: `Delete ${count} Connection${count > 1 ? "s" : ""}`,
-      message: `Delete ${count} connection${count > 1 ? "s" : ""}? This cannot be undone.`,
-      onConfirm: async () => {
-        setConfirmState(null);
-        let failed = 0;
-        const idsToDelete = [...selectedConnectionIds];
-        for (const id of idsToDelete) {
-          try {
-            const res = await fetch(`/api/providers/${id}`, { method: "DELETE" });
-            if (!res.ok) failed += 1;
-          } catch (error) {
-            console.log("Error deleting connection:", error);
-            failed += 1;
-          }
-        }
-        setConnections(prev => prev.filter(c => !idsToDelete.includes(c.id)));
-        setSelectedConnectionIds([]);
-        if (failed > 0) alert(`Deleted ${idsToDelete.length - failed} connection(s), ${failed} failed.`);
       }
     });
   };
@@ -907,14 +866,6 @@ export default function ProviderDetailPage() {
       {connections
         .map((conn, index) => (
           <div key={conn.id} className="flex min-w-0 items-stretch">
-            <div className="flex shrink-0 items-center pl-1 sm:pl-2">
-              <input
-                type="checkbox"
-                checked={isSelected(conn.id)}
-                onChange={() => toggleSelectConnection(conn.id)}
-                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-            </div>
             <div className="flex-1 min-w-0">
               <ConnectionRow
                 connection={conn}
@@ -925,10 +876,9 @@ export default function ProviderDetailPage() {
                 onMoveUp={() => handleSwapPriority(index, index - 1)}
                 onMoveDown={() => handleSwapPriority(index, index + 1)}
                 onToggleActive={(isActive) => handleUpdateConnectionStatus(conn.id, isActive)}
-                autoPing={AUTO_PING_SETTINGS_KEYS[providerId] && conn.authType === "oauth" ? {
+                autoPing={providerId === "claude" && conn.authType === "oauth" ? {
                   on: autoPing.connections[conn.id] === true,
                   onToggle: (on) => handleAutoPingConnection(conn.id, on),
-                  provider: providerId,
                 } : null}
                 onUpdateProxy={async (proxyPoolId) => {
                   try {
@@ -1013,8 +963,8 @@ export default function ProviderDetailPage() {
   );
 
   const handleTestModel = async (modelId) => {
-    if (testingModelIds.has(modelId)) return;
-    setTestingModelIds((prev) => new Set(prev).add(modelId));
+    if (testingModelId) return;
+    setTestingModelId(modelId);
     try {
       const res = await fetch("/api/models/test", {
         method: "POST",
@@ -1024,185 +974,19 @@ export default function ProviderDetailPage() {
       const data = await res.json();
       setModelTestResults((prev) => ({ ...prev, [modelId]: data.ok ? "ok" : "error" }));
       setModelsTestError(data.ok ? "" : (data.error || "Model not reachable"));
+      if (data.ok) {
+        notify.success(`${providerDisplayAlias}/${modelId} is reachable`, "Model test");
+      } else {
+        notify.error(data.error || "Model not reachable", "Model test");
+      }
     } catch {
       setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
       setModelsTestError("Network error");
+      notify.error("Network error", "Model test");
     } finally {
-      setTestingModelIds((prev) => { const n = new Set(prev); n.delete(modelId); return n; });
+      setTestingModelId(null);
     }
   };
-
-  const renderModelsSection = () => {
-    if (isCompatible) {
-      return (
-        <CompatibleModelsSection
-          providerStorageAlias={providerStorageAlias}
-          providerDisplayAlias={providerDisplayAlias}
-          modelAliases={modelAliases}
-          customModels={customModels}
-          copied={copied}
-          onCopy={copy}
-          onSetAlias={handleSetAlias}
-          onDeleteAlias={handleDeleteAlias}
-          onAddCustomModel={(modelId) => handleAddCustomModel(modelId, "llm", providerStorageAlias)}
-          onDeleteCustomModel={(modelId) => handleDeleteCustomModel(modelId, "llm", providerStorageAlias)}
-          connections={connections}
-          isAnthropic={isAnthropicCompatible}
-        />
-      );
-    }
-    // Combine hardcoded models with Kilo free models (deduplicated)
-    // Exclude non-llm models (embedding, tts, etc.) — they have dedicated pages under media-providers
-    const allModels = [
-      ...models,
-      ...kiloFreeModels.filter((fm) => !models.some((m) => m.id === fm.id)),
-    ].filter((m) => { const k = getModelKind(m); return !k || k === "llm"; });
-    const disabledSet = new Set(disabledModelIds);
-    const displayModels = allModels.filter((m) => !disabledSet.has(m.id));
-    const disabledDisplayModels = allModels.filter((m) => disabledSet.has(m.id));
-    const customModelRows = getProviderCustomModelRows({
-      customModels,
-      modelAliases,
-      providerAlias: providerStorageAlias,
-      builtInModels: models,
-      type: "llm",
-    });
-
-    return (
-      <div className="flex flex-wrap gap-3">
-        {/* Custom models first */}
-        {customModelRows.map((model) => (
-          <ModelRow
-            key={`${model.source}-${model.fullModel}`}
-            model={{ id: model.id, name: model.name }}
-            fullModel={`${providerDisplayAlias}/${model.id}`}
-            alias={model.alias}
-            copied={copied}
-            onCopy={copy}
-            onSetAlias={() => {}}
-            onDeleteAlias={() => {
-              if (model.source === "custom") {
-                handleDeleteCustomModel(model.id, "llm", providerStorageAlias);
-              } else {
-                handleDeleteAlias(model.alias);
-              }
-            }}
-            testStatus={modelTestResults[model.id]}
-            onTest={connections.length > 0 || isFreeNoAuth ? () => handleTestModel(model.id) : undefined}
-            isTesting={testingModelIds.has(model.id)}
-            isCustom
-            isFree={false}
-            caps={getCaps(`${providerId}/${model.id}`)}
-            thinkingSuffix={resolveThinkingSuffix(model.id)}
-          />
-        ))}
-
-        {displayModels.map((model) => {
-          const fullModel = `${providerStorageAlias}/${model.id}`;
-          const oldFormatModel = `${providerId}/${model.id}`;
-          const existingAlias = Object.entries(modelAliases).find(
-            ([, m]) => m === fullModel || m === oldFormatModel
-          )?.[0];
-          return (
-            <ModelRow
-              key={model.id}
-              model={model}
-              fullModel={`${providerDisplayAlias}/${model.id}`}
-              alias={existingAlias}
-              copied={copied}
-              onCopy={copy}
-              onSetAlias={(alias) => handleSetAlias(model.id, alias, providerStorageAlias)}
-              onDeleteAlias={() => handleDeleteAlias(existingAlias)}
-              testStatus={modelTestResults[model.id]}
-              onTest={connections.length > 0 || isFreeNoAuth ? () => handleTestModel(model.id) : undefined}
-              isTesting={testingModelIds.has(model.id)}
-              isFree={model.isFree}
-              onDisable={() => handleDisableModel(model.id)}
-              caps={getCaps(`${providerId}/${model.id}`)}
-              thinkingSuffix={resolveThinkingSuffix(model.id)}
-            />
-          );
-        })}
-
-        {/* Add model button — inline, same style as model chips */}
-        <button
-          onClick={() => setShowAddCustomModel(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-3 py-2 text-xs text-primary transition-colors hover:border-primary hover:bg-primary/5 sm:w-auto"
-        >
-          <span className="material-symbols-outlined text-sm">add</span>
-          Add Model
-        </button>
-
-        {/* Import Qoder models button — only show for qoder provider */}
-        {providerId === "qoder" && connections.some((conn) => conn.isActive !== false) && (
-          <button
-            onClick={handleImportQoderModels}
-            disabled={importingQoderModels}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-blue-500/40 px-3 py-2 text-xs text-blue-600 dark:text-blue-400 transition-colors hover:border-blue-500 hover:bg-blue-500/5 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="material-symbols-outlined text-sm" style={importingQoderModels ? { animation: "spin 1s linear infinite" } : undefined}>
-              {importingQoderModels ? "progress_activity" : "download"}
-            </span>
-            {importingQoderModels ? translate("Fetching...") : translate("Fetch Qoder Models")}
-          </button>
-        )}
-
-        {/* Suggested models from provider API — show only models not yet added */}
-        {suggestedModels.length > 0 && (() => {
-          const addedFullModels = new Set([
-            ...Object.values(modelAliases),
-            ...customModelRows.map((model) => model.fullModel),
-          ]);
-          const hardcodedIds = new Set(models.map((m) => m.id));
-          const notAdded = suggestedModels.filter(
-            (m) => !addedFullModels.has(`${providerStorageAlias}/${m.id}`) && !hardcodedIds.has(m.id)
-          );
-          if (notAdded.length === 0) return null;
-          return (
-            <div className="w-full mt-2">
-              <p className="text-xs text-text-muted mb-2">Suggested free models (≥200k context):</p>
-              <div className="flex flex-wrap gap-2">
-                {notAdded.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={async () => {
-                      await handleAddCustomModel(m.id, "llm", providerStorageAlias);
-                    }}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs text-text-muted hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-colors"
-                    title={`${m.name} · ${(m.contextLength / 1000).toFixed(0)}k ctx`}
-                  >
-                    <span className="material-symbols-outlined text-[13px]">add</span>
-                    {m.id.split("/").pop()}
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Disabled models — restorable */}
-        {disabledDisplayModels.length > 0 && (
-          <div className="w-full mt-2">
-            <p className="text-xs text-text-muted mb-2">Disabled models ({disabledDisplayModels.length}):</p>
-            <div className="flex flex-wrap gap-2">
-              {disabledDisplayModels.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => handleEnableModel(m.id)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 text-xs text-text-muted hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-colors"
-                  title="Restore model"
-                >
-                  <span className="material-symbols-outlined text-[13px]">add</span>
-                  {m.id}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   if (loading) {
     return (
       <div className="flex flex-col gap-8">
@@ -1238,61 +1022,78 @@ export default function ProviderDetailPage() {
     <div className="flex min-w-0 flex-col gap-6 px-1 sm:gap-8 sm:px-0">
       {/* Header */}
       <div className="min-w-0">
-        <Link
-          href="/dashboard/providers"
-          className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-primary transition-colors mb-4"
-        >
-          <span className="material-symbols-outlined text-lg">arrow_back</span>
-          Back to Providers
-        </Link>
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-          <div
-            className="flex size-12 shrink-0 items-center justify-center rounded-lg"
-            style={{ backgroundColor: `${providerInfo.color}15` }}
-          >
-            {headerImgError ? (
-              <span className="text-sm font-bold" style={{ color: providerInfo.color }}>
-                {providerInfo.textIcon || providerInfo.id.slice(0, 2).toUpperCase()}
-              </span>
-            ) : (
-              <Image
-                src={getHeaderIconPath()}
-                alt={providerInfo.name}
-                width={48}
-                height={48}
-                className="max-h-12 max-w-12 rounded-lg object-contain"
-                sizes="48px"
-                onError={() => setHeaderImgError(true)}
-              />
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">{providerInfo.name}</h1>
+        <PageBackLink href="/dashboard/providers" label="Back to Providers" className="mb-4" />
+        <div className="provider-detail-header glass-panel-subtle rounded-2xl p-4 sm:p-5">
+          <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
+            <div
+              className="flex size-12 shrink-0 items-center justify-center rounded-xl glass-panel-subtle sm:size-14"
+              style={{ backgroundColor: `${providerInfo.color}15` }}
+            >
+              {headerImgError ? (
+                <span className="text-sm font-bold sm:text-base" style={{ color: providerInfo.color }}>
+                  {providerInfo.textIcon || providerInfo.id.slice(0, 2).toUpperCase()}
+                </span>
+              ) : (
+                <Image
+                  src={getHeaderIconPath()}
+                  alt={providerInfo.name}
+                  width={56}
+                  height={56}
+                  className="max-h-12 max-w-12 rounded-lg object-contain sm:max-h-14 sm:max-w-14"
+                  sizes="56px"
+                  onError={() => setHeaderImgError(true)}
+                />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="font-display text-xl font-semibold text-text-main truncate sm:text-2xl">
+                {providerInfo.name}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2" data-i18n-skip>
+                <StatusMetricChip
+                  icon="link"
+                  label={translate("connected")}
+                  value={connections.filter((c) => c.isActive !== false).length}
+                  variant="info"
+                  hideWhenZero={false}
+                />
+                <StatusMetricChip
+                  icon="link_off"
+                  label={translate("errors")}
+                  value={connections.filter(
+                    (c) =>
+                      c.isActive !== false &&
+                      (c.testStatus === "error" || c.testStatus === "expired" || c.lastError),
+                  ).length}
+                  variant="danger"
+                  iconOnly
+                  title={translate("Connection error")}
+                />
+                <span className="text-xs text-text-muted">
+                  {translateFormat(
+                    connections.length === 1 ? "{count} connection" : "{count} connections",
+                    { count: connections.length },
+                  )}
+                </span>
+              </div>
               {(providerInfo.notice?.apiKeyUrl || providerInfo.notice?.signupUrl || providerInfo.website) && (
                 <a
                   href={providerInfo.notice?.apiKeyUrl || providerInfo.notice?.signupUrl || providerInfo.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
                 >
                   <span className="material-symbols-outlined text-sm">open_in_new</span>
-                  {providerInfo.notice?.apiKeyUrl ? "Get API Key" : "Sign up / Learn more"}
+                  {providerInfo.notice?.apiKeyUrl ? translate("Get API Key") : translate("Sign up / Learn more")}
                 </a>
               )}
             </div>
-            <p className="text-text-muted">
-              {connections.length} connection{connections.length === 1 ? "" : "s"}
-            </p>
           </div>
         </div>
       </div>
 
       {providerInfo.deprecated && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-          <span className="material-symbols-outlined text-[16px] text-yellow-500 mt-0.5 shrink-0">warning</span>
-          <p className="text-xs text-red-600 dark:text-yellow-400 leading-relaxed">{providerInfo.deprecationNotice}</p>
-        </div>
+        <GlassAlert variant="warning" hideIcon message={providerInfo.deprecationNotice} />
       )}
 
       {providerInfo.notice?.text && !providerInfo.deprecated && (
@@ -1356,10 +1157,15 @@ export default function ProviderDetailPage() {
                       try {
                         const res = await fetch(`/api/provider-nodes/${providerId}`, { method: "DELETE" });
                         if (res.ok) {
+                          notify.success("Compatible provider deleted", "Providers");
                           router.push("/dashboard/providers");
+                        } else {
+                          const data = await res.json().catch(() => ({}));
+                          notify.error(data.error || "Failed to delete provider", "Providers");
                         }
                       } catch (error) {
                         console.log("Error deleting provider node:", error);
+                        notify.error("Failed to delete provider", "Providers");
                       }
                     }
                   });
@@ -1393,16 +1199,6 @@ export default function ProviderDetailPage() {
               )}
               {connections.length > 0 && (
                 <>
-                  {selectedConnectionIds.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      icon="delete"
-                      onClick={handleBulkDelete}
-                    >
-                      Delete Selected ({selectedConnectionIds.length})
-                    </Button>
-                  )}
                   <Button
                     size="sm"
                     variant="secondary"
@@ -1425,6 +1221,21 @@ export default function ProviderDetailPage() {
                   )}
                 </>
               )}
+              {/* Thinking config */}
+              {/* {thinkingConfig && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-muted font-medium">Thinking</span>
+                  <select
+                    value={thinkingMode}
+                    onChange={(e) => handleThinkingModeChange(e.target.value)}
+                    className="text-xs px-2 py-1 border border-border rounded-md bg-background focus:outline-none focus:border-primary"
+                  >
+                    {thinkingConfig.options.map((opt) => (
+                      <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+              )} */}
               {/* Round Robin toggle */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-text-muted font-medium">Round Robin</span>
@@ -1500,32 +1311,28 @@ export default function ProviderDetailPage() {
           ) : (
             <>
               {oneByOneSummary && (
-                <div className="mb-4 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 text-xs text-text-muted dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span>Total: {oneByOneSummary.total}</span>
-                    <span>Completed: {oneByOneSummary.completed}</span>
-                    <span>Passed: {oneByOneSummary.passed}</span>
-                    <span>Failed: {oneByOneSummary.failed}</span>
+                <div className="mb-4 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusMetricChip icon="layers" label="Total" value={oneByOneSummary.total} variant="muted" hideWhenZero={false} />
+                    <StatusMetricChip icon="task_alt" label="Done" value={oneByOneSummary.completed} variant="info" hideWhenZero={false} />
+                    <StatusMetricChip icon="check_circle" label="Passed" value={oneByOneSummary.passed} variant="success" />
+                    <StatusMetricChip icon="cancel" label="Failed" value={oneByOneSummary.failed} variant="danger" />
                     {oneByOneSummary.stopped && (
-                      <span className="text-amber-600 dark:text-amber-400">Stopped</span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300" data-i18n-skip>
+                        <span className="material-symbols-outlined text-[14px]">pause_circle</span>
+                        <span>Stopped</span>
+                      </span>
                     )}
                     {oneByOneRunning && oneByOneCurrentConnectionId && (
-                      <span>Running: {connections.find((conn) => conn.id === oneByOneCurrentConnectionId)?.name || oneByOneCurrentConnectionId}</span>
+                      <StatusMetricChip
+                        icon="progress_activity"
+                        label="Running"
+                        value={connections.find((conn) => conn.id === oneByOneCurrentConnectionId)?.name || "…"}
+                        variant="info"
+                        hideWhenZero={false}
+                      />
                     )}
                   </div>
-                </div>
-              )}
-              {connections.length > 0 && (
-                <div className="mb-3 flex items-center gap-2 border-b border-black/[0.03] pb-2 dark:border-white/[0.03]">
-                  <label className="flex cursor-pointer items-center gap-1.5 text-xs text-text-muted hover:text-primary">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={toggleSelectAllConnections}
-                      className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    Select All
-                  </label>
                 </div>
               )}
               {connectionsList}
@@ -1594,50 +1401,45 @@ export default function ProviderDetailPage() {
 
       {/* Models */}
       <Card>
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold">
-              {"Available Models"}
-            </h2>
-            {providerThinkingLevels && (
-              <select
-                value={thinkingMode}
-                onChange={(e) => handleThinkingModeChange(e.target.value)}
-                title="Appends (level) suffix to copied model names"
-                className="rounded-md border border-border bg-background px-2 py-1 text-xs focus:border-primary focus:outline-none"
-              >
-                {providerThinkingLevels.map((opt) => (
-                  <option key={opt} value={opt}>{`Thinking: ${opt.charAt(0).toUpperCase() + opt.slice(1)}`}</option>
-                ))}
-              </select>
-            )}
-          </div>
-          {!isCompatible && (() => {
-            const allIds = [
-              ...models,
-              ...kiloFreeModels.filter((fm) => !models.some((m) => m.id === fm.id)),
-            ].filter((m) => { const k = getModelKind(m); return !k || k === "llm"; }).map((m) => m.id);
-            const activeIds = allIds.filter((id) => !disabledModelIds.includes(id));
-            return (
-              <div className="flex gap-2">
-                {disabledModelIds.length > 0 && (
-                  <Button size="sm" variant="secondary" icon="restart_alt" onClick={handleEnableAll}>
-                    Active All
-                  </Button>
-                )}
-                {activeIds.length > 0 && (
-                  <Button size="sm" variant="secondary" icon="block" onClick={() => handleDisableAll(activeIds)}>
-                    Disable All
-                  </Button>
-                )}
-              </div>
-            );
-          })()}
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold">Available Models</h2>
+          <p className="text-sm text-text-muted mt-1">
+            Search, filter, and bulk-manage models for this provider.
+          </p>
         </div>
-        {!!modelsTestError && (
-          <p className="text-xs text-red-500 mb-3 break-words">{modelsTestError}</p>
-        )}
-        {renderModelsSection()}
+        <ModelsManagerPanel
+          isCompatible={isCompatible}
+          providerId={providerId}
+          providerInfo={providerInfo}
+          providerStorageAlias={providerStorageAlias}
+          providerDisplayAlias={providerDisplayAlias}
+          models={models}
+          kiloFreeModels={kiloFreeModels}
+          disabledModelIds={disabledModelIds}
+          customModels={customModels}
+          modelAliases={modelAliases}
+          modelTestResults={modelTestResults}
+          testingModelId={testingModelId}
+          modelsTestError={modelsTestError}
+          connections={connections}
+          isFreeNoAuth={isFreeNoAuth}
+          suggestedModels={suggestedModels}
+          copied={copied}
+          onCopy={copy}
+          onSetAlias={handleSetAlias}
+          onDeleteAlias={handleDeleteAlias}
+          onDeleteCustomModel={(modelId) => handleDeleteCustomModel(modelId, "llm", providerStorageAlias)}
+          onTestModel={handleTestModel}
+          onDisableModel={handleDisableModel}
+          onEnableModel={handleEnableModel}
+          onEnableAll={handleEnableAll}
+          onDisableAll={handleDisableAll}
+          onAddCustomModel={() => setShowAddCustomModel(true)}
+          onImportQoderModels={handleImportQoderModels}
+          importingQoderModels={importingQoderModels}
+          isAnthropicCompatible={isAnthropicCompatible}
+          getCaps={getCaps}
+        />
       </Card>
 
       {bulkActionModal}
@@ -1690,7 +1492,6 @@ export default function ProviderDetailPage() {
         website={providerInfo?.website}
         proxyPools={proxyPools}
         error={addConnectionError}
-        existingNames={connections.map((c) => c.name).filter(Boolean)}
         onSave={handleSaveApiKey}
         onBulkDone={fetchConnections}
         onClose={() => {
@@ -1720,8 +1521,8 @@ export default function ProviderDetailPage() {
           providerAlias={providerStorageAlias}
           providerDisplayAlias={providerDisplayAlias}
           onSave={async (modelId) => {
-            await handleAddCustomModel(modelId, "llm", providerStorageAlias);
-            setShowAddCustomModel(false);
+            const ok = await handleAddCustomModel(modelId, "llm", providerStorageAlias);
+            if (ok) setShowAddCustomModel(false);
           }}
           onClose={() => setShowAddCustomModel(false)}
         />

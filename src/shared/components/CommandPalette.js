@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Kbd } from "@heroui/react";
 import Modal from "./Modal";
 import Input from "./Input";
 import { cn } from "@/shared/utils/cn";
@@ -118,7 +119,7 @@ export default function CommandPalette() {
         />
         <ul className="max-h-[min(50vh,360px)] overflow-y-auto custom-scrollbar -mx-1">
           {items.length === 0 ? (
-            <li className="px-3 py-6 text-sm text-text-muted text-center">No results</li>
+            <li className="px-3 py-6 text-sm text-default-500 text-center">No results</li>
           ) : (
             items.map((item, index) => (
               <li key={item.id}>
@@ -128,8 +129,8 @@ export default function CommandPalette() {
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm rounded-xl transition-colors",
                     index === activeIndex
-                      ? "bg-brand-500/10 text-text-main"
-                      : "text-text-muted hover:bg-surface-2 hover:text-text-main"
+                      ? "bg-primary/10 text-foreground"
+                      : "text-default-500 hover:bg-default-100 hover:text-foreground"
                   )}
                 >
                   <span className="material-symbols-outlined text-[18px] shrink-0">{item.icon}</span>
@@ -139,15 +140,15 @@ export default function CommandPalette() {
             ))
           )}
         </ul>
-        <div className="flex gap-3 text-[10px] text-text-muted pt-1 border-t border-border-subtle">
+        <div className="flex gap-3 text-[10px] text-default-400 pt-1 border-t border-divider">
           <span>↑↓ navigate</span>
           <span>↵ open</span>
           <span className="hidden sm:inline-flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border-subtle">⌘</kbd>
-            <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border-subtle">K</kbd>
+            <Kbd>⌘</Kbd>
+            <Kbd>K</Kbd>
             toggle
           </span>
-          <kbd className="ml-auto hidden sm:inline-flex px-1.5 py-0.5 rounded bg-surface-2 border border-border-subtle">Esc</kbd>
+          <Kbd className="ml-auto hidden sm:inline-flex">Esc</Kbd>
         </div>
       </div>
     </Modal>
