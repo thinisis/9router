@@ -35,6 +35,7 @@ export const LOCALE_META = {
   fi: { countryCode: "fi", nativeName: "Suomi", englishName: "Finnish" },
   da: { countryCode: "dk", nativeName: "Dansk", englishName: "Danish" },
   no: { countryCode: "no", nativeName: "Norsk", englishName: "Norwegian" },
+  fa: { countryCode: "ir", nativeName: "فارسی", englishName: "Persian" },
 };
 
 export function getLocaleMeta(locale) {

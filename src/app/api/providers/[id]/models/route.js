@@ -4,9 +4,12 @@ import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "@/sha
 import { GEMINI_CONFIG } from "@/lib/oauth/constants/oauth";
 import { refreshGoogleToken, updateProviderCredentials } from "@/sse/services/tokenRefresh";
 import { resolveOllamaLocalHost } from "open-sse/config/providers.js";
+import { getModelsByProviderId } from "open-sse/config/providerModels.js";
 import { resolveKiroModels } from "open-sse/services/kiroModels.js";
+import { resolveKimchiModels } from "open-sse/services/kimchiModels.js";
 import { resolveQoderModels } from "open-sse/services/qoderModels.js";
-import { resolveClinepassModels } from "open-sse/services/clinepassModels.js";
+import { resolveGrokCliModels } from "open-sse/services/grokCliModels.js";
+import { resolveConnectionProxyConfig } from "@/lib/network/connectionProxy";
 
 const GEMINI_CLI_MODELS_URL = "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";
 
@@ -79,6 +82,13 @@ const resolveQwenModelsUrl = (connection) => {
   }
   return `https://${value.replace(/\/$/, "")}/v1/models`;
 };
+
+const getStaticProviderModels = (providerId) =>
+  getModelsByProviderId(providerId).map((model) => ({
+    ...model,
+    id: model.id,
+    name: model.name || model.id,
+  }));
 
 // Generic custom resolver for OAuth providers that need refresh-on-401 + token persist.
 // Receives a `fetchFn(token)` and returns parsed models or throws.
@@ -228,6 +238,7 @@ const PROVIDER_MODELS_CONFIG = {
   xai: createOpenAIModelsConfig("https://api.x.ai/v1/models"),
   mistral: createOpenAIModelsConfig("https://api.mistral.ai/v1/models"),
   perplexity: createOpenAIModelsConfig("https://api.perplexity.ai/v1/models"),
+  "perplexity-agent": createOpenAIModelsConfig("https://api.perplexity.ai/v1/models"),
   together: createOpenAIModelsConfig("https://api.together.xyz/v1/models"),
   fireworks: createOpenAIModelsConfig("https://api.fireworks.ai/inference/v1/models"),
   cerebras: createOpenAIModelsConfig("https://api.cerebras.ai/v1/models"),
@@ -242,6 +253,22 @@ const PROVIDER_MODELS_CONFIG = {
   nvidia: createOpenAIModelsConfig("https://integrate.api.nvidia.com/v1/models"),
   assemblyai: createOpenAIModelsConfig("https://api.assemblyai.com/v1/models"),
   "vercel-ai-gateway": createOpenAIModelsConfig("https://ai-gateway.vercel.sh/v1/models"),
+  kimchi: {
+    customResolver: async (connection) => {
+      const result = await resolveKimchiModels({
+        accessToken: connection.accessToken,
+        apiKey: connection.apiKey,
+        providerSpecificData: connection.providerSpecificData || {},
+      }, { forceRefresh: true, log: console });
+      if (result?.models?.length) {
+        return { models: result.models };
+      }
+      return {
+        models: getStaticProviderModels("kimchi"),
+        warning: "Kimchi returned no live models; falling back to static catalog.",
+      };
+    }
+  },
 
   // Custom resolvers (non-OpenAI-shaped APIs / token-refresh flows)
   kiro: {
@@ -344,23 +371,33 @@ const PROVIDER_MODELS_CONFIG = {
       errorLabel: "Failed to fetch Gemini CLI models"
     })
   },
-  clinepass: {
+  "grok-cli": {
     customResolver: async (connection) => {
-      let warning;
-      try {
-        const result = await resolveClinepassModels({
-          accessToken: connection.accessToken,
-          apiKey: connection.apiKey,
-        });
-        if (result?.models?.length) {
-          return { models: result.models };
-        }
-        warning = "ClinePass returned no models; falling back to static catalog.";
-      } catch (error) {
-        warning = `Failed to fetch ClinePass models: ${error.message}`;
-        console.log("Failed to fetch ClinePass models dynamically, falling back to static:", error.message);
-      }
-      return { models: [], warning };
+      const proxy = await resolveConnectionProxyConfig(connection.providerSpecificData || {});
+      const result = await resolveGrokCliModels({
+        ...connection,
+        connectionId: connection.id,
+      }, {
+        log: console,
+        proxyOptions: {
+          connectionProxyEnabled: proxy.connectionProxyEnabled === true,
+          connectionProxyUrl: proxy.connectionProxyUrl || "",
+          connectionNoProxy: proxy.connectionNoProxy || "",
+          vercelRelayUrl: proxy.vercelRelayUrl || "",
+          strictProxy: proxy.strictProxy === true,
+        },
+        onCredentialsRefreshed: async (refreshed) => {
+          await updateProviderCredentials(connection.id, {
+            ...refreshed,
+            existingProviderSpecificData: connection.providerSpecificData || {},
+          });
+        },
+      });
+      if (result.models.length) return result;
+      return {
+        models: getStaticProviderModels("grok-cli"),
+        warning: result.warning || "Grok CLI returned no live models; using static catalog.",
+      };
     },
   },
   "ollama-local": {

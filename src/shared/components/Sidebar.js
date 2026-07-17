@@ -11,7 +11,9 @@ import { MEDIA_PROVIDER_KINDS } from "@/shared/constants/providers";
 import { translate } from "@/i18n/runtime";
 import CreditsNotice from "./CreditsNotice";
 
-const VISIBLE_MEDIA_KINDS = ["embedding", "image", "tts", "stt"];
+// const VISIBLE_MEDIA_KINDS = ["embedding", "image", "imageToText", "tts", "stt", "webSearch", "webFetch", "video", "music"];
+const VISIBLE_MEDIA_KINDS = ["embedding", "image", "video", "tts", "stt"];
+// Combined entry: webSearch + webFetch share one page at /dashboard/media-providers/web
 const COMBINED_WEB_ITEM = {
   id: "web",
   label: "Web Fetch & Search",
@@ -26,7 +28,8 @@ const navItems = [
   { href: "/dashboard/combos", label: "Combos", icon: "layers" },
   { href: "/dashboard/usage", label: "Usage", icon: "bar_chart" },
   { href: "/dashboard/quota", label: "Quota Tracker", icon: "data_usage" },
-  { href: "/dashboard/mitm", label: "MITM", icon: "security" },
+  { href: "/dashboard/token-saver", label: "Token Saver", icon: "savings" },
+  // { href: "/dashboard/pxpipe", label: "PXPIPE", icon: "image" },
   { href: "/dashboard/cli-tools", label: "CLI Tools", icon: "terminal" },
 ];
 

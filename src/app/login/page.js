@@ -1,70 +1,22 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Input, GlassAlert } from "@/shared/components";
-import ThemeToggle from "@/shared/components/ThemeToggle";
-import CreditsNotice from "@/shared/components/CreditsNotice";
-import LoginActionButton from "./LoginActionButton";
-import { useLoginAnimations } from "./useLoginAnimations";
-import { useRouter } from "next/navigation";
-import { ensureGsapRegistered, gsap, useGSAP } from "@/shared/lib/gsapClient";
-import { prefersReducedMotion } from "@/shared/utils/motion";
-
-const FEATURES = [
-  { icon: "hub", label: "Multi-provider routing", desc: "Fallback combos across OAuth and API keys" },
-  { icon: "security", label: "Secure access", desc: "Password, OIDC, and API key enforcement" },
-  { icon: "terminal", label: "CLI & MITM ready", desc: "Configure IDE tools from one dashboard" },
-];
-
-const SUCCESS_HOLD_MS = 720;
+import { useState, useEffect } from "react";
+import { Card, Button, Input } from "@/shared/components";
 
 export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [resetHint, setResetHint] = useState("");
   const [retryAfter, setRetryAfter] = useState(0);
-  const [loadingAction, setLoadingAction] = useState(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [hasPassword, setHasPassword] = useState(null);
   const [authMode, setAuthMode] = useState("password");
   const [oidcConfigured, setOidcConfigured] = useState(false);
   const [oidcLoginLabel, setOidcLoginLabel] = useState("Sign in with OIDC");
   const [mustChange, setMustChange] = useState(false);
   const [newPassword, setNewPassword] = useState("");
-  const router = useRouter();
-  const pageRef = useRef(null);
-  const oidcLoadingRef = useRef(false);
 
-  const {
-    cardRef,
-    overlayRef,
-    formRef,
-    runClickPulse,
-    runLoadingAmbient,
-    runSuccessExit,
-    runErrorFeedback,
-    runMustChangeTransition,
-    resetAmbient,
-  } = useLoginAnimations();
-
-  useGSAP(
-    () => {
-      if (hasPassword === null) return;
-      if (prefersReducedMotion()) {
-        gsap.set("[data-login-brand],[data-login-feature],[data-login-card],[data-login-credit]", { autoAlpha: 1, x: 0, y: 0, scale: 1 });
-        return;
-      }
-      ensureGsapRegistered();
-      gsap.set("[data-login-brand],[data-login-feature],[data-login-card],[data-login-credit]", { autoAlpha: 1 });
-      const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
-      tl.from("[data-login-brand]", { x: -12, duration: 0.28 })
-        .from("[data-login-feature]", { y: 6, duration: 0.22, stagger: 0.04 }, "-=0.18")
-        .from("[data-login-card]", { y: 8, scale: 0.995, duration: 0.26 }, "-=0.14")
-        .from("[data-login-credit]", { y: 4, duration: 0.18 }, "-=0.1");
-    },
-    { scope: pageRef, dependencies: [hasPassword] }
-  );
-
+  // Countdown for rate-limit
   useEffect(() => {
     if (retryAfter <= 0) return;
     const id = setInterval(() => setRetryAfter((s) => (s > 0 ? s - 1 : 0)), 1000);
@@ -78,14 +30,15 @@ export default function LoginPage() {
       const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
       try {
-        const res = await fetch(`${baseUrl}/api/auth/status`, { signal: controller.signal });
+        const res = await fetch(`${baseUrl}/api/auth/status`, {
+          signal: controller.signal,
+        });
         clearTimeout(timeoutId);
 
         if (res.ok) {
           const data = await res.json();
           if (data.requireLogin === false) {
-            router.push("/dashboard");
-            router.refresh();
+            window.location.assign("/dashboard");
             return;
           }
           setHasPassword(!!data.hasPassword);
@@ -93,36 +46,22 @@ export default function LoginPage() {
           setOidcConfigured(data.oidcConfigured === true);
           setOidcLoginLabel(data.oidcLoginLabel || "Sign in with OIDC");
         } else {
+          // Safe fallback on non-OK response to avoid infinite loading state.
           setHasPassword(true);
         }
-      } catch {
+      } catch (err) {
         clearTimeout(timeoutId);
         setHasPassword(true);
       }
     }
     checkAuth();
-  }, [router]);
-
-  const navigateAfterSuccess = () => {
-    router.push("/dashboard");
-    router.refresh();
-  };
-
-  const playSuccessAndNavigate = () => {
-    setSubmitSuccess(true);
-    runSuccessExit(() => {
-      setTimeout(navigateAfterSuccess, prefersReducedMotion() ? 0 : 120);
-    });
-  };
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoadingAction("password");
-    setSubmitSuccess(false);
+    setLoading(true);
     setError("");
     setResetHint("");
-    runClickPulse();
-    runLoadingAmbient();
 
     try {
       const res = await fetch("/api/auth/login", {
@@ -135,39 +74,27 @@ export default function LoginPage() {
         const data = await res.json();
         if (data.mustChangePassword) {
           setMustChange(true);
-          setLoadingAction(null);
-          resetAmbient();
-          runMustChangeTransition();
           return;
         }
-        await new Promise((r) => setTimeout(r, prefersReducedMotion() ? 0 : SUCCESS_HOLD_MS));
-        playSuccessAndNavigate();
-        return;
+        window.location.assign("/dashboard");
+      } else {
+        const data = await res.json();
+        setError(data.error || "Invalid password");
+        if (data.resetHint) setResetHint(data.resetHint);
+        if (data.retryAfter) setRetryAfter(Number(data.retryAfter));
       }
-
-      const data = await res.json();
-      setError(data.error || "Invalid password");
-      if (data.resetHint) setResetHint(data.resetHint);
-      if (data.retryAfter) setRetryAfter(Number(data.retryAfter));
-      setLoadingAction(null);
-      resetAmbient();
-      runErrorFeedback();
-    } catch {
+    } catch (err) {
       setError("An error occurred. Please try again.");
-      setLoadingAction(null);
-      resetAmbient();
-      runErrorFeedback();
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Force a new password before entering the dashboard (default + remote).
   const handleSetNewPassword = async (e) => {
     e.preventDefault();
-    setLoadingAction("setPassword");
-    setSubmitSuccess(false);
+    setLoading(true);
     setError("");
-    runClickPulse();
-    runLoadingAmbient();
-
     try {
       const res = await fetch("/api/settings", {
         method: "PATCH",
@@ -175,253 +102,145 @@ export default function LoginPage() {
         body: JSON.stringify({ currentPassword: password, newPassword }),
       });
       if (res.ok) {
-        await new Promise((r) => setTimeout(r, prefersReducedMotion() ? 0 : SUCCESS_HOLD_MS));
-        playSuccessAndNavigate();
-        return;
+        window.location.assign("/dashboard");
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to set password");
       }
-      const data = await res.json();
-      setError(data.error || "Failed to set password");
-      setLoadingAction(null);
-      resetAmbient();
-      runErrorFeedback();
-    } catch {
+    } catch (err) {
       setError("An error occurred. Please try again.");
-      setLoadingAction(null);
-      resetAmbient();
-      runErrorFeedback();
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleOidcLogin = () => {
-    if (oidcLoadingRef.current) return;
-    oidcLoadingRef.current = true;
-    setLoadingAction("oidc");
-    runClickPulse();
-    runLoadingAmbient();
-
-    if (!prefersReducedMotion()) {
-      ensureGsapRegistered();
-      const btn = document.querySelector("[data-login-oidc]");
-      if (btn) {
-        gsap.to(btn, { scale: 0.97, duration: 0.1, yoyo: true, repeat: 1 });
-      }
-    }
-
-    setTimeout(() => {
-      window.location.href = "/api/auth/oidc/start";
-    }, prefersReducedMotion() ? 0 : 380);
+    window.location.href = "/api/auth/oidc/start";
   };
 
   const oidcAvailable = oidcConfigured && ["oidc", "both"].includes(authMode);
   const passwordAvailable = authMode !== "oidc" || !oidcConfigured;
 
-  const subtitle =
-    authMode === "oidc" && oidcConfigured
-      ? "Sign in with your identity provider to access the control plane."
-      : "Authenticate to manage providers, endpoints, and routing.";
-
-  const authPending = hasPassword === null;
-
-  const urlError =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("error")
-      : null;
+  // Show loading state while checking password
+  if (hasPassword === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bg p-4">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-text-muted mt-4">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="login-shell">
-      <div className="liquid-bg" aria-hidden="true" />
-      <div className="login-orbs" aria-hidden="true">
-        <span className="login-orb login-orb-a" />
-        <span className="login-orb login-orb-b" />
-        <span className="login-orb login-orb-c" />
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-bg p-4 relative overflow-hidden">
+      {/* Faint grid background */}
+      <div className="landing-grid absolute inset-0 pointer-events-none" aria-hidden="true" />
+      <div className="relative z-10 w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-primary mb-2">9Router</h1>
+          <p className="text-text-muted">
+            {authMode === "oidc" && oidcConfigured
+              ? "Sign in with your OIDC provider to access the dashboard"
+              : "Enter your password to access the dashboard"}
+          </p>
+        </div>
 
-      <div ref={overlayRef} className="login-success-overlay" aria-hidden="true" />
-
-      <div className="login-topbar">
-        <ThemeToggle className="login-theme-toggle" />
-      </div>
-
-      <div ref={pageRef} className="login-layout">
-        <aside className="login-brand-panel" data-login-brand>
-          <div className="login-brand-mark">
-            <div className="login-brand-icon">
-              <span className="material-symbols-outlined">hub</span>
-            </div>
-            <div>
-              <p className="login-brand-eyebrow">Control plane</p>
-              <h1 className="login-brand-title">9Router</h1>
-            </div>
-          </div>
-
-          <p className="login-brand-lead">{subtitle}</p>
-
-          <ul className="login-feature-list">
-            {FEATURES.map((feature) => (
-              <li key={feature.label} className="login-feature-item" data-login-feature>
-                <span className="login-feature-icon material-symbols-outlined">{feature.icon}</span>
-                <div>
-                  <p className="login-feature-label">{feature.label}</p>
-                  <p className="login-feature-desc">{feature.desc}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </aside>
-
-        <main className="login-form-panel">
-          <div className="login-mobile-hero lg:hidden" data-login-brand>
-            <div className="login-brand-icon login-brand-icon-sm">
-              <span className="material-symbols-outlined">hub</span>
-            </div>
-            <div>
-              <h1 className="login-mobile-title">9Router</h1>
-              <p className="login-mobile-sub">{subtitle}</p>
-            </div>
-          </div>
-
-          <div ref={cardRef} className="login-glass-card" data-login-card>
-            {authPending && (
-              <div className="login-card-pending" aria-live="polite">
-                <div className="login-loading-ring login-loading-ring--sm" />
-                <span className="text-xs text-text-muted">Preparing sign-in…</span>
-              </div>
-            )}
-            <div className={`login-card-body ${authPending ? "login-card-body--pending" : ""}`}>
-            <div className="login-card-header">
-              <h2 className="login-card-title">
-                {mustChange ? "Set new password" : "Sign in"}
-              </h2>
-              <p className="login-card-sub">
-                {mustChange
-                  ? "Remote access requires a stronger password before continuing."
-                  : oidcAvailable && !passwordAvailable
-                    ? "Use your configured identity provider."
-                    : "Enter credentials or continue with SSO."}
+        <Card>
+          {mustChange ? (
+            <form onSubmit={handleSetNewPassword} className="flex flex-col gap-4">
+              <p className="text-sm text-amber-600 dark:text-amber-400 text-center">
+                Set a new password before accessing the dashboard remotely.
               </p>
-            </div>
-
-            {urlError && (
-              <GlassAlert
-                variant="error"
-                hideIcon
-                message={`Authentication failed: ${urlError.replace(/_/g, " ")}`}
-                className="mb-4"
-                data-login-error-alert
-              />
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">New password</label>
+                <Input
+                  type="password"
+                  placeholder="Enter new password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  autoFocus
+                />
+                {error && <p className="text-xs text-red-500">{error}</p>}
+              </div>
+              <Button type="submit" variant="primary" className="w-full" loading={loading} disabled={!newPassword}>
+                Set password
+              </Button>
+            </form>
+          ) : (
+          <div className="flex flex-col gap-4">
+            {oidcAvailable && (
+              <Button type="button" variant="primary" className="w-full" onClick={handleOidcLogin}>
+                {oidcLoginLabel}
+              </Button>
             )}
 
-            <div ref={formRef}>
-              {mustChange ? (
-                <form onSubmit={handleSetNewPassword} className="login-form">
-                  <GlassAlert
-                    variant="warning"
-                    hideIcon
-                    message="Set a new password before accessing the dashboard remotely."
-                  />
+            {oidcAvailable && passwordAvailable && <div className="h-px bg-border/60" />}
+
+            {passwordAvailable ? (
+              <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                {((authMode === "oidc" && !oidcConfigured) || (authMode === "both" && !oidcConfigured)) && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                    OIDC login is enabled, but the issuer/client fields are not configured yet. Password login is still available for recovery.
+                  </p>
+                )}
+
+                {authMode === "both" && oidcConfigured && (
+                  <p className="text-xs text-text-muted text-center">
+                    Password and OIDC login are both enabled.
+                  </p>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Password</label>
                   <Input
-                    label="New password"
                     type="password"
-                    placeholder="Enter new password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
-                    autoFocus
+                    autoFocus={!oidcAvailable}
                   />
-                  {error && (
-                    <div data-login-error-alert>
-                      <GlassAlert variant="error" hideIcon message={error} />
-                    </div>
+                  {error && <p className="text-xs text-red-500">{error}</p>}
+                  {retryAfter > 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Locked. Retry in <span className="font-mono">{retryAfter}s</span>.
+                    </p>
                   )}
-                  <LoginActionButton
-                    type="submit"
-                    variant="primary"
-                    loading={loadingAction === "setPassword"}
-                    success={submitSuccess}
-                    disabled={!newPassword}
-                  >
-                    Set password
-                  </LoginActionButton>
-                </form>
-              ) : (
-                <div className="login-form">
-                  {oidcAvailable && (
-                    <LoginActionButton
-                      type="button"
-                      variant="primary"
-                      icon="login"
-                      loading={loadingAction === "oidc"}
-                      disabled={loadingAction === "password" || loadingAction === "setPassword"}
-                      onClick={handleOidcLogin}
-                      data-login-oidc
-                    >
-                      {oidcLoginLabel}
-                    </LoginActionButton>
-                  )}
-
-                  {oidcAvailable && passwordAvailable && (
-                    <div className="login-divider">
-                      <span>or continue with password</span>
-                    </div>
-                  )}
-
-                  {passwordAvailable ? (
-                    <form onSubmit={handleLogin} className="login-form">
-                      <Input
-                        label="Password"
-                        type="password"
-                        placeholder="Enter password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        autoFocus={!oidcAvailable}
-                        icon="lock"
-                      />
-                      {error && (
-                        <div data-login-error-alert>
-                          <GlassAlert variant="error" hideIcon message={error} />
-                        </div>
-                      )}
-                      {retryAfter > 0 && (
-                        <GlassAlert
-                          variant="warning"
-                          hideIcon
-                          message={`Locked. Retry in ${retryAfter}s.`}
-                        />
-                      )}
-                      {resetHint && (
-                        <p className="login-hint">
-                          Forgot password? Use{" "}
-                          <code className="login-hint-code">9router</code> CLI → Settings → Reset Password.
-                        </p>
-                      )}
-                      <LoginActionButton
-                        type="submit"
-                        variant={oidcAvailable ? "secondary" : "primary"}
-                        loading={loadingAction === "password" && !submitSuccess}
-                        success={submitSuccess}
-                        disabled={retryAfter > 0 || loadingAction === "oidc" || !password}
-                      >
-                        {retryAfter > 0 ? `Wait ${retryAfter}s` : "Sign in"}
-                      </LoginActionButton>
-                    </form>
-                  ) : (
-                    error && (
-                      <div data-login-error-alert>
-                        <GlassAlert variant="error" hideIcon message={error} />
-                      </div>
-                    )
+                  {resetHint && (
+                    <p className="text-xs text-text-muted">
+                      Forgot password? Open <code className="bg-sidebar px-1 rounded">9router</code> CLI on the host → <b>Settings</b> → <b>Reset Password to Default</b>.
+                    </p>
                   )}
                 </div>
-              )}
-            </div>
-            </div>
-          </div>
 
-          <div data-login-credit className="login-credits">
-            <CreditsNotice compact />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="w-full"
+                  loading={loading}
+                  disabled={retryAfter > 0}
+                >
+                  {retryAfter > 0 ? `Wait ${retryAfter}s` : "Login"}
+                </Button>
+
+                <p className="text-xs text-center text-text-muted mt-2">
+                  Default password is <code className="bg-sidebar px-1 rounded">123456</code>
+                </p>
+                {hasPassword === false && (
+                  <p className="text-xs text-center text-amber-600 dark:text-amber-400">
+                    Security risk: no password set. You will be asked to set one when logging in remotely.
+                  </p>
+                )}
+              </form>
+            ) : (
+              error && <p className="text-xs text-red-500">{error}</p>
+            )}
           </div>
-        </main>
+          )}
+        </Card>
       </div>
     </div>
   );

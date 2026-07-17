@@ -19,7 +19,6 @@ import {
   getXaiSessionStatus,
   clearXaiSession,
 } from "@/lib/oauth/utils/server";
-import { resolveRedirectUri } from "@/lib/oauth/defaultRedirectUri";
 
 async function completeXaiManualCode(code, state) {
   const session = state ? getXaiSessionStatus(state) : null;
@@ -73,7 +72,7 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url);
 
     if (action === "authorize") {
-      const redirectUri = resolveRedirectUri(provider, searchParams.get("redirect_uri"));
+      const redirectUri = searchParams.get("redirect_uri") || "http://localhost:8080/callback";
       // Collect provider-specific meta params (e.g. gitlab passes baseUrl, clientId, clientSecret)
       const reservedParams = new Set(["redirect_uri"]);
       const meta = {};
@@ -92,7 +91,7 @@ export async function GET(request, { params }) {
       }
       const state = searchParams.get("state");
       const codeVerifier = searchParams.get("code_verifier");
-      const redirectUri = resolveRedirectUri(provider, searchParams.get("redirect_uri"));
+      const redirectUri = searchParams.get("redirect_uri");
       const result = provider === "xai"
         ? await startXaiProxy(Number(appPort))
         : await startCodexProxy(Number(appPort));
@@ -151,8 +150,16 @@ export async function GET(request, { params }) {
           }
         : undefined;
       
-      // Providers that don't use PKCE for device code
-      const noPkceDeviceProviders = ["github", "kiro", "kimi-coding", "kilocode", "codebuddy-cn", "qoder"];
+      // Providers that don't use PKCE for device code (Grok CLI HAR: plain device_code, no challenge)
+      const noPkceDeviceProviders = [
+        "github",
+        "kiro",
+        "kimi-coding",
+        "kilocode",
+        "codebuddy-cn",
+        "qoder",
+        "grok-cli",
+      ];
       let deviceData;
       if (noPkceDeviceProviders.includes(provider)) {
         deviceData = await requestDeviceCode(provider, undefined, deviceOptions);
@@ -233,8 +240,8 @@ export async function POST(request, { params }) {
         });
       }
 
-      // Cline and ClinePass use authorization_code without PKCE
-      const noPkceExchangeProviders = ["cline", "clinepass"];
+      // Cline and ClinePass use authorization_code without PKCE. Kimchi returns a browser token.
+      const noPkceExchangeProviders = ["cline", "clinepass", "kimchi"];
       if (!code || !redirectUri || (!codeVerifier && !noPkceExchangeProviders.includes(provider))) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
       }
